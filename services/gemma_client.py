@@ -1,100 +1,225 @@
 import os
 import json
 import re
+import time
+import asyncio
 import base64
 import httpx
+from urllib.parse import urlparse
 from typing import Dict, Any, List, Optional
 from services.interaction_engine import ClinicalInteractionEngine
 
 from dotenv import load_dotenv
 load_dotenv()
 
-# Load environment defaults
-GEMMA_API_KEY = os.getenv("GEMMA_API_KEY", "")
-GEMMA_API_BASE = os.getenv("GEMMA_API_BASE", "https://generativelanguage.googleapis.com/v1beta")
-GEMMA_MODEL = os.getenv("GEMMA_MODEL", "gemma-4-26b-a4b-it")
-FALLBACK_MODE = os.getenv("FALLBACK_MODE", "true").lower() == "true"
+# --------------------------------------------------------------------------
+# Provider registry. Each provider keeps its own key / endpoint / model.
+# "gemma": Google AI Studio native API.  "groq": OpenAI-compatible chat API.
+# --------------------------------------------------------------------------
+PROVIDERS: Dict[str, Dict[str, Any]] = {
+    "gemma": {
+        "label": "Gemma 4",
+        "env": ("GEMMA_API_KEY", "GEMMA_API_BASE", "GEMMA_MODEL"),
+        "default_base": "https://generativelanguage.googleapis.com/v1beta",
+        "default_model": "gemma-4-26b-a4b-it",
+    },
+    "groq": {
+        "label": "Groq",
+        "env": ("GROQ_API_KEY", "GROQ_API_BASE", "GROQ_MODEL"),
+        "default_base": "https://api.groq.com/openai/v1",
+        "default_model": "qwen/qwen3.8-27b",
+    },
+}
+
+EXTRACTION_PROMPT = """
+You are a clinical pharmacist reading a prescription image. Transcribe every medication and the patient details exactly as written.
+
+Return ONLY valid raw JSON. No markdown fences, no commentary:
+{
+  "patient": {"name": "", "age_gender": "", "doctor": "", "date": ""},
+  "medications": [
+    {"name": "", "dosage": "", "frequency": "", "timing": "", "duration": ""}
+  ],
+  "clinical_notes": ""
+}
+
+Field rules:
+- name: drug or brand name as written, e.g. "Augmentin 625 mg (Amoxicillin)".
+- dosage: strength of one unit, e.g. "500 mg". Not the number of tablets.
+- frequency: the morning-afternoon-night pattern as digits plus a plain description, e.g. "1-0-1 (Twice daily)", "0-0-1 (Bedtime)", "1-1-1 (Thrice daily)". Convert words or abbreviations (BD, TDS, OD, HS) to this form. Use "SOS (as needed)" for as-needed drugs.
+- timing: relation to food, e.g. "After meals", "Empty stomach".
+- duration: e.g. "5 days", "1 month", "Ongoing".
+- Use an empty string for anything not visible. Do not invent values.
+"""
+
+_GOOGLE_HOST = "generativelanguage.googleapis.com"
 
 
 class GemmaClient:
+    """Reads prescriptions through the active provider, with optional failover to the other one."""
+
     def __init__(self, interaction_engine: ClinicalInteractionEngine):
         self.engine = interaction_engine
-        self.api_key = os.getenv("GEMMA_API_KEY", GEMMA_API_KEY).strip()
-        self.api_base = os.getenv("GEMMA_API_BASE", GEMMA_API_BASE).strip()
-        self.model_name = self._normalize_model(os.getenv("GEMMA_MODEL", GEMMA_MODEL))
+        self.settings: Dict[str, Dict[str, str]] = {}
+        for pid, meta in PROVIDERS.items():
+            key_env, base_env, model_env = meta["env"]
+            self.settings[pid] = {
+                "api_key": os.getenv(key_env, "").strip(),
+                "api_base": os.getenv(base_env, "").strip() or meta["default_base"],
+                "model": self._normalize_model(pid, os.getenv(model_env, "")),
+            }
+        active = os.getenv("ACTIVE_PROVIDER", "gemma").strip().lower()
+        self.active = active if active in PROVIDERS else "gemma"
+        self.failover = os.getenv("AUTO_FAILOVER", "true").strip().lower() == "true"
 
-    def _normalize_model(self, model: str) -> str:
-        m = (model or "").strip()
-        if m in ("gemma-4-it", "gemma-4", "gemma4", "gemma"):
-            return "gemma-4-26b-a4b-it"
-        return m or "gemma-4-26b-a4b-it"
+    # ---- active-provider shortcuts (used by health / config endpoints) ----
+    @property
+    def api_key(self) -> str:
+        return self.settings[self.active]["api_key"]
 
-    def update_config(self, api_key: Optional[str] = None, api_base: Optional[str] = None, model: Optional[str] = None):
-        if api_key is not None:
-            self.api_key = api_key.strip()
-        if api_base is not None and api_base.strip():
-            self.api_base = api_base.strip()
-        if model is not None and model.strip():
-            self.model_name = self._normalize_model(model)
+    @property
+    def api_base(self) -> str:
+        return self.settings[self.active]["api_base"]
+
+    @property
+    def model_name(self) -> str:
+        return self.settings[self.active]["model"]
 
     @staticmethod
+    def _normalize_model(provider: str, model: str) -> str:
+        m = (model or "").strip()
+        default = PROVIDERS[provider]["default_model"]
+        if provider == "gemma" and m in ("gemma-4-it", "gemma-4", "gemma4", "gemma"):
+            return default
+        return m or default
+
+    @staticmethod
+    def _mask(key: str) -> str:
+        if not key:
+            return ""
+        return key[:4] + "..." + key[-4:] if len(key) > 8 else "***"
+
+    def public_config(self) -> Dict[str, Any]:
+        """Configuration safe to send to the browser (keys are masked)."""
+        providers = {}
+        for pid, meta in PROVIDERS.items():
+            cfg = self.settings[pid]
+            providers[pid] = {
+                "label": meta["label"],
+                "api_key_set": bool(cfg["api_key"]),
+                "masked_key": self._mask(cfg["api_key"]),
+                "api_base": cfg["api_base"],
+                "model": cfg["model"],
+                "default_base": meta["default_base"],
+                "default_model": meta["default_model"],
+            }
+        active = providers[self.active]
+        return {
+            "active": self.active,
+            "failover": self.failover,
+            "providers": providers,
+            # Backwards-compatible fields describing the active provider.
+            "api_key_set": active["api_key_set"],
+            "masked_key": active["masked_key"],
+            "api_base": active["api_base"],
+            "model": active["model"],
+        }
+
+    def configure(self, provider: str, api_key: Optional[str] = None, api_base: Optional[str] = None,
+                  model: Optional[str] = None, activate: bool = True, failover: Optional[bool] = None) -> None:
+        if provider not in PROVIDERS:
+            raise ValueError(f"Unknown provider '{provider}'")
+        cfg = self.settings[provider]
+        if api_key is not None:
+            cfg["api_key"] = api_key.strip()
+        if api_base is not None and api_base.strip():
+            base = api_base.strip()
+            if not base.lower().startswith(("https://", "http://localhost", "http://127.0.0.1")):
+                raise ValueError("API base URL must start with https://")
+            cfg["api_base"] = base
+        if model is not None and model.strip():
+            cfg["model"] = self._normalize_model(provider, model)
+        if activate:
+            self.active = provider
+        if failover is not None:
+            self.failover = bool(failover)
+
+    def update_config(self, api_key: Optional[str] = None, api_base: Optional[str] = None, model: Optional[str] = None):
+        """Legacy helper: updates the active provider."""
+        self.configure(self.active, api_key=api_key, api_base=api_base, model=model, activate=False)
+
+    # ---- error handling ----
+    @staticmethod
     def _describe_error(exc: Exception, api_key: str) -> str:
-        """Short, key-safe description of an API failure (httpx errors embed the request URL, which carries the key)."""
+        """Short, key-safe description of an API failure (httpx errors embed the request URL, which can carry the key)."""
         if isinstance(exc, httpx.HTTPStatusError):
-            return f"HTTP {exc.response.status_code} from model endpoint"
+            code = exc.response.status_code
+            hint = {400: "request or key rejected", 401: "key rejected", 403: "key rejected", 404: "model not found",
+                    413: "image too large", 429: "rate limited"}.get(code)
+            return f"{hint} (HTTP {code})" if hint else f"HTTP {code} from model endpoint"
         if isinstance(exc, httpx.TimeoutException):
-            return "Model endpoint timed out"
+            return "model endpoint timed out"
         if isinstance(exc, httpx.RequestError):
-            return "Could not reach model endpoint"
+            return "could not reach model endpoint"
         msg = f"{type(exc).__name__}: {exc}"
         return msg.replace(api_key, "***") if api_key else msg
 
-    def active_engine(self, config_override: Optional[dict] = None) -> Dict[str, str]:
-        """Describes which engine will serve the next request (used for progress reporting)."""
-        api_key = (config_override or {}).get("api_key") or self.api_key
-        return {"engine": "live" if api_key else "offline", "model": self.model_name}
+    # ---- provider selection ----
+    def _attempt_order(self) -> List[str]:
+        order = [self.active]
+        if self.failover:
+            order += [p for p in PROVIDERS if p != self.active]
+        return order
 
-    async def extract_prescription(self, image_bytes: bytes, filename: str = "prescription.jpg", config_override: Optional[dict] = None) -> Dict[str, Any]:
+    def active_engine(self) -> Dict[str, str]:
+        """Describes which provider will serve the next request (used for progress reporting)."""
+        for pid in self._attempt_order():
+            cfg = self.settings[pid]
+            if cfg["api_key"]:
+                host = urlparse(cfg["api_base"]).netloc or cfg["api_base"]
+                return {"engine": "live", "provider": pid, "label": PROVIDERS[pid]["label"], "model": cfg["model"], "host": host}
+        return {"engine": "offline", "provider": "offline", "label": "Offline engine", "model": "offline-clinical-engine", "host": ""}
+
+    async def extract_prescription(self, image_bytes: bytes, filename: str = "prescription.jpg") -> Dict[str, Any]:
         """
-        Stage 1: reads the prescription (live Gemma call, or offline engine as fallback).
-        Returns {"raw", "source", "engine", "model", "fallback_reason"}.
+        Stage 1: reads the prescription through the active provider, failing over to the other
+        configured provider, and finally to the offline engine.
         """
-        api_key = self.api_key
-        api_base = self.api_base
-        model = self.model_name
-
-        if config_override:
-            if config_override.get("api_key"):
-                api_key = config_override["api_key"]
-            if config_override.get("api_base"):
-                api_base = config_override["api_base"]
-            if config_override.get("model"):
-                model = self._normalize_model(config_override["model"])
-
-        reason = None
-        if api_key:
+        attempts: List[Dict[str, str]] = []
+        for pid in self._attempt_order():
+            cfg = self.settings[pid]
+            label = PROVIDERS[pid]["label"]
+            if not cfg["api_key"]:
+                if pid == self.active:
+                    attempts.append({"provider": pid, "label": label, "error": "no API key configured"})
+                continue
             try:
-                result = await self._call_gemma_api(image_bytes, api_key, api_base, model)
+                result = await self._call_model(image_bytes, cfg)
                 if result and result.get("medications"):
                     return {
                         "raw": result,
-                        "source": f"Gemma 4 Live API ({model})",
+                        "source": f"{label} ({cfg['model']})",
                         "engine": "live",
-                        "model": model,
+                        "provider": pid,
+                        "label": label,
+                        "model": cfg["model"],
+                        "attempts": attempts,
                         "fallback_reason": None,
                     }
-                reason = "Model returned no medications"
+                attempts.append({"provider": pid, "label": label, "error": "model returned no medications"})
             except Exception as e:
-                reason = self._describe_error(e, api_key)
-            print(f"[GemmaClient] Live API unavailable ({reason}). Engaging clinical heuristic engine...")
-        else:
-            reason = "No API key configured"
+                attempts.append({"provider": pid, "label": label, "error": self._describe_error(e, cfg["api_key"])})
+            print(f"[GemmaClient] {label} failed: {attempts[-1]['error']}")
 
+        reason = "; ".join(f"{a['label']}: {a['error']}" for a in attempts) or "no API key configured"
         return {
             "raw": self._generate_intelligent_fallback(image_bytes, filename),
             "source": "AushadhiDrishti Clinical Engine (Offline Mode)",
             "engine": "offline",
+            "provider": "offline",
+            "label": "Offline engine",
             "model": "offline-clinical-engine",
+            "attempts": attempts,
             "fallback_reason": reason,
         }
 
@@ -102,102 +227,85 @@ class GemmaClient:
         """Stage 2: database enrichment, interaction screening, bilingual summaries."""
         return self._enrich_analysis(raw_data, source)
 
-    async def analyze_prescription(self, image_bytes: bytes, filename: str = "prescription.jpg", config_override: Optional[dict] = None) -> Dict[str, Any]:
-        """
-        Analyzes prescription image using Gemma 4 API.
-        If API key is absent or call fails, gracefully executes clinical heuristic fallback.
-        """
-        extraction = await self.extract_prescription(image_bytes, filename, config_override)
+    async def analyze_prescription(self, image_bytes: bytes, filename: str = "prescription.jpg") -> Dict[str, Any]:
+        extraction = await self.extract_prescription(image_bytes, filename)
         return self.enrich(extraction["raw"], extraction["source"])
 
-    async def _call_gemma_api(self, image_bytes: bytes, api_key: str, api_base: str, model: str) -> Dict[str, Any]:
-        """Calls Google Generative AI / OpenAI-compatible Gemma endpoint with multimodal vision payload."""
+    async def ping(self, provider: str) -> Dict[str, Any]:
+        """Sends a tiny text request to verify the stored key, endpoint and model for a provider."""
+        if provider not in PROVIDERS:
+            return {"ok": False, "message": "Unknown provider"}
+        cfg = self.settings[provider]
+        if not cfg["api_key"]:
+            return {"ok": False, "message": "No API key configured"}
+        started = time.perf_counter()
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                if _GOOGLE_HOST in cfg["api_base"]:
+                    url = f"{cfg['api_base'].rstrip('/')}/models/{cfg['model']}:generateContent"
+                    res = await client.post(url, headers={"x-goog-api-key": cfg["api_key"]},
+                                            json={"contents": [{"parts": [{"text": "Reply with: ok"}]}],
+                                                  "generationConfig": {"maxOutputTokens": 64}})
+                else:
+                    res = await client.post(f"{cfg['api_base'].rstrip('/')}/chat/completions",
+                                            headers={"Authorization": f"Bearer {cfg['api_key']}"},
+                                            json={"model": cfg["model"], "max_tokens": 8,
+                                                  "messages": [{"role": "user", "content": "Reply with: ok"}]})
+                res.raise_for_status()
+        except Exception as e:
+            return {"ok": False, "message": self._describe_error(e, cfg["api_key"])}
+        return {"ok": True, "latency_ms": round((time.perf_counter() - started) * 1000), "message": "Connected"}
+
+    # ---- model calls ----
+    @staticmethod
+    async def _post(client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Response:
+        """POST with a single retry when the provider answers 429 with a short wait."""
+        res = await client.post(url, **kwargs)
+        if res.status_code == 429:
+            try:
+                wait = float(res.headers.get("retry-after", "5"))
+            except ValueError:
+                wait = 5.0
+            if wait <= 20:
+                await asyncio.sleep(wait + 0.5)
+                res = await client.post(url, **kwargs)
+        res.raise_for_status()
+        return res
+
+    async def _call_model(self, image_bytes: bytes, cfg: Dict[str, str]) -> Dict[str, Any]:
+        """Sends the prescription image to a Google-style or OpenAI-compatible multimodal endpoint."""
+        api_key, api_base, model = cfg["api_key"], cfg["api_base"], cfg["model"]
         b64_image = base64.b64encode(image_bytes).decode("utf-8")
-        
-        prompt = """
-        You are an expert Clinical Pharmacologist and AI Prescription Scanner.
-        Carefully examine this prescription image. Transcribe and extract all medications, patient details, and instructions.
-        
-        Return ONLY valid raw JSON with NO markdown code fences, NO backticks:
-        {
-          "patient": {
-            "name": "Patient Name or Unknown",
-            "age_gender": "Age / Gender if visible",
-            "doctor": "Doctor Name if visible",
-            "date": "Date if visible"
-          },
-          "medications": [
-            {
-              "name": "Full drug/brand name (e.g. Metformin, Augmentin)",
-              "dosage": "Dosage (e.g. 500mg, 40mg)",
-              "frequency": "Frequency (e.g. 1-0-1, Once daily, Twice daily)",
-              "timing": "Timing (e.g. After food, Before food, Bedtime)",
-              "duration": "Duration (e.g. 5 days, 1 month, Regular)"
+
+        if _GOOGLE_HOST in api_base:
+            url = f"{api_base.rstrip('/')}/models/{model}:generateContent"
+            payload = {
+                "contents": [{"parts": [
+                    {"text": EXTRACTION_PROMPT},
+                    {"inline_data": {"mime_type": "image/jpeg", "data": b64_image}},
+                ]}],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 8192},
             }
-          ],
-          "clinical_notes": "Key clinical summary or dietary/lifestyle advice given on the prescription"
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                res = await self._post(client, url, json=payload, headers={"x-goog-api-key": api_key})
+                parts = res.json()["candidates"][0]["content"]["parts"]
+                # Gemma 4 returns its reasoning as separate parts flagged "thought"; only answer parts hold the JSON.
+                text = "".join(p.get("text", "") for p in parts if not p.get("thought")) or parts[-1].get("text", "")
+                return self._parse_json_response(text)
+
+        url = f"{api_base.rstrip('/')}/chat/completions"
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": EXTRACTION_PROMPT},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
+            ]}],
+            "temperature": 0.1,
+            "max_tokens": 4096,
         }
-        """
-
-        # Check if Google Generative Language endpoint
-        if "generativelanguage.googleapis.com" in api_base:
-            url = f"{api_base.rstrip('/')}/models/{model}:generateContent?key={api_key}"
-            payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": prompt},
-                            {
-                                "inline_data": {
-                                    "mime_type": "image/jpeg",
-                                    "data": b64_image
-                                }
-                            }
-                        ]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.1,
-                    "maxOutputTokens": 2048
-                }
-            }
-            async with httpx.AsyncClient(timeout=45.0) as client:
-                res = await client.post(url, json=payload)
-                res.raise_for_status()
-                data = res.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
-                return self._parse_json_response(text)
-
-        # Standard OpenAI / vLLM / OpenRouter / Groq / HuggingFace endpoint
-        else:
-            url = f"{api_base.rstrip('/')}/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": model,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}
-                            }
-                        ]
-                    }
-                ],
-                "temperature": 0.1,
-                "max_tokens": 1500
-            }
-            async with httpx.AsyncClient(timeout=45.0) as client:
-                res = await client.post(url, headers=headers, json=payload)
-                res.raise_for_status()
-                data = res.json()
-                text = data["choices"][0]["message"]["content"]
-                return self._parse_json_response(text)
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            res = await self._post(client, url, json=payload, headers={"Authorization": f"Bearer {api_key}"})
+            return self._parse_json_response(res.json()["choices"][0]["message"]["content"])
 
     def _parse_json_response(self, text: str) -> Dict[str, Any]:
         """Extracts JSON object even if the model outputs reasoning thoughts or markdown fences."""

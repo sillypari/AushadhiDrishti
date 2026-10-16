@@ -1,113 +1,269 @@
-# 👁️ AushadhiDrishti (औषधि दृष्टि)
-### *Next-Generation Multimodal AI Prescription Scanner & Medication Safety Intelligence*
+# AushadhiDrishti (औषधि दृष्टि)
 
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)
-![Gemma 4](https://img.shields.io/badge/AI%20Vision-Gemma%204%20Multimodal-4285F4?logo=google)
-![Languages](https://img.shields.io/badge/Languages-English%20%7C%20%E0%A4%B9%E0%A4%BF%E0%A4%A8%E0%A5%8D%E0%A4%A6%E0%A5%80-orange)
+Multimodal Artificial Intelligence Prescription Scanner and Clinical Medication Safety Engine.
 
----
-
-## 🌟 Executive Summary & Motivation
-Illegible doctor handwriting leads to over **1.5 million preventable medication errors annually**. In multilingual regions like India, this crisis is compounded by language barriers—patients frequently take the wrong dosage, mix contraindicated medications, or take pills at the wrong time (e.g., taking empty-stomach antacids after food).
-
-**AushadhiDrishti (औषधि दृष्टि)** directly solves this crisis by combining:
-1. **Gemma 4 Multimodal Vision**: Deciphers messy handwriting and extracts clinical entities (Medication, Dosage, Frequency, Timing).
-2. **Pillow Handwriting Contrast Preprocessor**: Enhances ink-stroke visibility, balances dynamic range, and auto-rotates phone snapshots.
-3. **Clinical Drug-Drug Interaction Matrix**: Checks all prescribed medications for lethal combinations (e.g., Warfarin + Aspirin or Ibuprofen) with instant severity warnings.
-4. **Bilingual Hindi & English UI (Default: English)**: Seamless real-time translation of all instructions, schedule timetables, and warnings.
-5. **Listen Aloud (आवाज़ में सुनें)**: Web Speech TTS in Hindi and English for elderly or visually impaired patients.
-6. **Printable Medical Timetable Card**: Clean 3-slot daily schedule (Morning ☀️, Afternoon 🌤️, Night 🌙) exportable to PDF/print.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Backend Framework](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![Multimodal Vision](https://img.shields.io/badge/Vision%20Engine-Gemma%204%20Multimodal-4285F4.svg)](https://ai.google.dev/)
+[![Supported Languages](https://img.shields.io/badge/Languages-English%20%7C%20Hindi-orange.svg)](#bilingual-support)
 
 ---
 
-## 🔄 Architectural Synthesis of Root Repositories
-AushadhiDrishti synthesizes the strongest breakthroughs from three reference prototypes:
+## Table of Contents
 
-| Feature / Capability | `Medical-AI-with-Grok4` | `medscan-lens` | `prescription-analysis-ai` | **AushadhiDrishti (Our Project)** |
-| :--- | :---: | :---: | :---: | :---: |
-| **Model / Vision** | Grok-4 / xAI | Gemma 3 4B | Local Llama / Tesseract | **Gemma 4 Multimodal + Heuristic Engine** |
-| **Bilingual Support (Hindi/English)** | ❌ No | ❌ No | ❌ No | **✅ Full Bilingual UI + Audio TTS** |
-| **Drug Interaction Matrix** | ❌ None | ⚠️ Basic 4 pairs | ❌ None | **✅ 50+ Drugs + Multi-tier Severity DB** |
-| **Handwriting Image Enhancement** | ⚠️ Basic | ✅ PIL Filter | ✅ Contrast / Sharpness | **✅ Optimized Multistage Pipeline** |
-| **UI Aesthetics & UX** | Gradio | Streamlit | Tailwind / HTML2PDF | **✅ Ultra-Modern Health-Tech Web UI** |
-| **1-Click Test Demo Prescriptions** | ❌ None | ⚠️ Notebook script | ❌ None | **✅ 3 Authentic Built-in Prescriptions** |
-| **Audio Voice Synthesis** | ❌ No | ❌ No | ❌ No | **✅ Hindi & English Web Speech API** |
+- [Overview](#overview)
+- [Clinical Motivation](#clinical-motivation)
+- [Core Architecture](#core-architecture)
+- [Key Capabilities](#key-capabilities)
+- [Technology Stack](#technology-stack)
+- [Directory Structure](#directory-structure)
+- [Installation and Setup](#installation-and-setup)
+- [Configuration](#configuration)
+- [Running the Application](#running-the-application)
+- [Evaluation Scenarios](#evaluation-scenarios)
+- [API Reference](#api-reference)
+- [Clinical Safety Disclaimer](#clinical-safety-disclaimer)
 
 ---
 
-## 🛠️ System Architecture
+## Overview
+
+AushadhiDrishti (औषधि दृष्टि) is an end-to-end clinical workflow system designed to digitize handwritten medical prescriptions, identify pharmaceutical compounds, screen for contraindications and drug-drug interactions, and convert clinical instructions into patient-friendly daily regimens in both English and Hindi.
+
+The platform integrates computer vision, multimodal reasoning powered by Gemma 4, and an automated clinical pharmacology matrix. Designed for real-world clinical and patient environments, it supports camera captures, mobile uploads, speech synthesis (Text-to-Speech) for low-literacy or visually impaired patients, and printable medical schedules.
+
+---
+
+## Clinical Motivation
+
+Preventable adverse drug events (ADEs) and medication errors remain among the leading causes of morbidity worldwide:
+
+1. **Illegible Handwriting**: Unclear handwritten prescriptions cause misinterpretation of drug names, dosages, and administration intervals.
+2. **Brand-Name Ambiguity**: In India and emerging markets, hundreds of commercial brand names map to the same generic molecules, causing accidental double-dosing or unrecognized contraindications.
+3. **Complex Polypharmacy**: Patients undergoing concurrent treatments for chronic and acute conditions often receive conflicting medications without unified interaction screening.
+4. **Linguistic and Literacy Barriers**: Medical instructions written in English are frequently misunderstood by non-English-speaking populations, leading to improper timing (such as consuming proton-pump inhibitors after meals instead of on an empty stomach).
+
+AushadhiDrishti addresses these challenges directly at the point of patient care.
+
+---
+
+## Core Architecture
 
 ```mermaid
 graph TD
-    A[Prescription Upload / Camera / Sample] --> B[Pillow Image Preprocessor]
-    B -->|Contrast + Sharpness + Resize| C[Gemma 4 Multimodal Vision API]
-    C -->|Structured JSON Extraction| D[Clinical Pharmacology Engine]
-    D -->|Drug Database Normalization| E[Brand-to-Generic Resolver]
-    E --> F[Drug-Drug Interaction Checker]
-    F -->|Contraindicated / Major / Moderate| G[Safety Score Calculator]
-    G --> H[Bilingual Timetable & Patient Summary Generator]
-    H --> I[Modern Interactive Dashboard]
-    I --> J[Audio TTS in Hindi & English]
-    I --> K[Printable Medical Card]
+    A[Prescription Image: Camera / Upload / Sample] --> B[Pillow Preprocessor: Orientation, Contrast, Sharpness]
+    B --> C[Multimodal Vision Engine: Gemma 4 Multimodal / Fallback]
+    C --> D[Structured Clinical Extraction: Patient, Rx Items, Instructions]
+    D --> E[Brand-to-Generic Normalization Engine]
+    E --> F[Pharmacological Drug-Drug Interaction Matrix]
+    F --> G[Safety Assessment and Risk Scoring Engine]
+    G --> H[Bilingual Localization Engine: English & Hindi]
+    H --> I[Reactive Web UI & Live Telemetry Stream]
+    I --> J[Daily Regimen Timetable: Morning / Afternoon / Night]
+    I --> K[Text-to-Speech Audio Synthesis: Web Speech API]
+    I --> L[Printable Patient Summary Card]
+```
+
+### Pipeline Progression
+
+1. **Image Ingestion and Normalization**: The raw image is processed through Pillow to correct EXIF rotation, balance dynamic contrast, enhance ink-stroke sharpness, and bound image dimensions for neural processing.
+2. **Multimodal Clinical Extraction**: The enhanced prescription is processed by Gemma 4 multimodal vision endpoints. The model transcribes patient data, prescribed drugs, dosages, frequencies, and durations into structured JSON.
+3. **Brand-to-Generic Resolution**: Extracted brand names (e.g., Augmentin, Dolo, Brufen) are mapped to standard generic entities (e.g., Amoxicillin-Clavulanic Acid, Paracetamol, Ibuprofen).
+4. **Interaction and Safety Screening**: The normalized regimen is evaluated against the clinical interaction database, scoring risks across three distinct clinical severity tiers: Contraindicated, Major, and Moderate.
+5. **Bilingual Synthesis and Output**: Structured summaries, food-relative administration guidelines, warning advisories, and three-slot daily schedules (Morning, Afternoon, Night) are rendered in real time.
+
+---
+
+## Key Capabilities
+
+### Multimodal Vision and Handwriting Recognition
+- Deciphers non-standard handwriting and clinical shorthand (e.g., "1-0-1", "OD", "BD", "TDS", "SOS", "ac", "pc").
+- Powered by Gemma 4 multimodal vision architecture for zero-shot clinical document reasoning.
+- Offline heuristic fallback engine for uninterrupted demonstration even without active network or API access.
+
+### Contrast and Stroke Preprocessing
+- Automatic orientation correction from mobile camera EXIF metadata.
+- Adaptive luminance balancing and unsharp-masking to clarify faded ballpoint and fountain pen strokes against colored or shadowed prescription pads.
+
+### Pharmacology Engine and Safety Matrix
+- Verified drug catalog mapping Indian commercial brand names, international generics, therapeutic classes, and indications.
+- Multi-tier interaction screening:
+  - **Contraindicated**: Lethal or life-threatening combinations (e.g., Warfarin + NSAIDs causing major hemorrhage).
+  - **Major**: Severe interactions requiring medical dosage adjustment or close monitoring.
+  - **Moderate**: Mild interactions requiring spacing or timing adjustments.
+- Quantitative safety index calculated per prescription.
+
+### Bilingual Accessibility and Speech
+- Full dual-language interface (English default, with real-time Hindi translation for all fields).
+- Integrated Web Speech API for voice readout in both Hindi and English.
+- Formatted daily medication schedule organized by time of day with meal indicators.
+- Printable, high-contrast summary cards exportable directly to PDF.
+
+### Live Telemetry Streaming
+- Server-Sent Events / NDJSON streaming for transparent progress updates:
+  - Stage 1: Upload received
+  - Stage 2: Image contrast enhancement
+  - Stage 3: Neural vision processing with live elapsed timer
+  - Stage 4: Clinical interaction and safety analysis
+  - Stage 5: Final report compilation
+
+---
+
+## Technology Stack
+
+- **Backend Runtime**: Python 3.10+
+- **API Framework**: FastAPI, Uvicorn
+- **HTTP Client**: HTTPX (asynchronous client with connection pooling and retry handling)
+- **Image Processing**: Pillow (PIL)
+- **Data Validation**: Pydantic v2
+- **Frontend Architecture**: Modern Vanilla JavaScript (ES6+), HTML5 Semantic markup, Vanilla CSS (design tokens, glassmorphism, responsive grid)
+- **Audio Synthesis**: Native Browser Web Speech API (SpeechSynthesis)
+- **Data Formats**: JSON, NDJSON (application/x-ndjson)
+
+---
+
+## Directory Structure
+
+```
+AushadhiDrishti/
+├── app.py                      # FastAPI application entrypoint and route handlers
+├── requirements.txt            # Python dependencies
+├── run.bat                     # Windows quick-launch script
+├── .env.example                # Template for environment configuration
+├── .gitignore                  # Git exclusions (environment files, bytecode, caches)
+├── README.md                   # Project documentation
+├── data/
+│   ├── drug_database.json      # Comprehensive drug catalog and generic mappings
+│   ├── interactions.json       # Clinical interaction rules and severity matrices
+│   └── *.jpg                   # Demonstration reference images
+├── services/
+│   ├── __init__.py
+│   ├── preprocessor.py         # Pillow contrast and image enhancement pipeline
+│   ├── gemma_client.py         # Multimodal API client and offline fallback engine
+│   └── interaction_engine.py   # Clinical rule matcher and safety scoring
+└── static/
+    ├── index.html              # Main single-page web dashboard
+    ├── css/
+    │   └── style.css           # Design system, responsive layouts, color tokens
+    ├── js/
+    │   └── app.js              # Application logic, streaming consumer, TTS, i18n
+    └── samples/                # Generated sample prescription image assets
 ```
 
 ---
 
-## 🚀 Quick Start Guide
+## Installation and Setup
 
 ### 1. Prerequisites
-- Python 3.10, 3.11, 3.12, or 3.13
-- Internet browser (Chrome, Edge, Firefox, Safari)
+- Python 3.10, 3.11, 3.12, or 3.13 installed and added to the system PATH.
+- Git installed on your local machine.
+- A modern web browser (Google Chrome, Microsoft Edge, Mozilla Firefox, or Safari).
 
-### 2. Installation
+### 2. Clone the Repository
 ```bash
-# Navigate to the project directory
+git clone https://github.com/sillypari/AushadhiDrishti.git
 cd AushadhiDrishti
+```
 
-# Install lightweight dependencies
+### 3. Create a Virtual Environment (Recommended)
+```bash
+# On Windows
+python -m venv venv
+venv\Scripts\activate
+
+# On Linux / macOS
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 4. Install Dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure API (Optional)
-Copy `.env.example` to `.env`:
+---
+
+## Configuration
+
+Copy the example environment file to create your local `.env`:
+
 ```bash
 cp .env.example .env
 ```
-Add your Gemma 4 / Google AI Studio API key (or leave blank to run in offline heuristic mode during demonstrations):
+
+Edit `.env` to configure your API parameters:
+
 ```env
-GEMMA_API_KEY=your_google_ai_studio_or_gemma_key
+# Google AI Studio / Gemma Multimodal API Configuration
+GEMMA_API_KEY=your_google_ai_studio_api_key_here
 GEMMA_API_BASE=https://generativelanguage.googleapis.com/v1beta
-GEMMA_MODEL=gemma-4-it
-```
-*(Note: You can also configure the API key directly from the Web UI by clicking **⚙️ API Settings**!)*
+GEMMA_MODEL=gemma-4-26b-a4b-it
 
-### 4. Run the Web Application
+# Demonstration Fallback Mode (true enables offline heuristics if API key is blank)
+FALLBACK_MODE=true
+```
+
+*Note: The platform includes a built-in offline demonstration engine. If no API keys are configured, the application automatically runs in demonstration mode using authentic clinical test fixtures.*
+
+---
+
+## Running the Application
+
+### Method A: Direct Command Line
 ```bash
-python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
-Open your browser and navigate to:
+
+### Method B: Windows Quick Launch
+Double-click `run.bat` or run:
+```bat
+run.bat
 ```
-http://localhost:8000
-```
+This script checks required dependencies, launches the server, and automatically opens your default browser at `http://127.0.0.1:8000`.
 
 ---
 
-## 📋 Evaluation Scenarios (Built-in 1-Click Samples)
-Judges and reviewers can immediately test the system using the pre-loaded sample prescriptions in the right panel:
+## Evaluation Scenarios
 
-1. **Cardio-Diabetic Regimen (Safe / Monitored)**:
-   - *Medications*: Metformin 500mg, Atorvastatin 20mg, Aspirin 75mg, Pantoprazole 40mg.
-   - *Checks*: Sugar management, lipid control, and empty-stomach PPI timing.
-2. **Acute Bacterial Infection & Fever (Acute Care)**:
-   - *Medications*: Augmentin 625mg, Dolo 650 (Paracetamol), Cetirizine 10mg, Pantoprazole 40mg.
-   - *Checks*: Emphasizes completing full antibiotic course; proper fever SOS schedule.
-3. **Severe Arthritis Pain & DVT (High Danger Warning)**:
-   - *Medications*: Brufen 400mg (Ibuprofen), Warfarin 5mg, Omeprazole 20mg.
-   - *Checks*: **CRITICAL CONTRAINDICATION** — highlights dangerous hemorrhage and bleeding alert.
+The web interface includes built-in test fixtures for immediate evaluation:
+
+1. **Cardio-Diabetic Regimen (Safe / Monitored)**
+   - **Medications**: Metformin 500mg, Atorvastatin 20mg, Aspirin 75mg, Pantoprazole 40mg.
+   - **Clinical Focus**: Chronic metabolic management, empty-stomach proton-pump inhibitor timing, and mild antiplatelet monitoring.
+
+2. **Acute Bacterial Infection and Fever (Acute Care)**
+   - **Medications**: Augmentin 625mg (Amoxicillin + Clavulanic Acid), Dolo 650 (Paracetamol), Cetirizine 10mg, Pantoprazole 40mg.
+   - **Clinical Focus**: Adherence to full antibiotic course duration, antipyretic timing, and symptom management.
+
+3. **Severe Arthritis Pain and DVT (Critical Risk Demonstration)**
+   - **Medications**: Brufen 400mg (Ibuprofen), Warfarin 5mg, Omeprazole 20mg.
+   - **Clinical Focus**: Highlights a contraindicated drug-drug interaction. Flagged for severe hemorrhagic risk caused by concurrent anticoagulant and non-steroidal anti-inflammatory administration.
 
 ---
 
-## 🔒 Safety & Disclaimer
-*AushadhiDrishti is developed as an AI-powered medication safety assistant for hackathons and educational demonstrations. It is not intended to replace certified medical diagnosis or clinical judgment. Always verify medication plans with a licensed healthcare professional.*
+## API Reference
+
+### Health and Status
+- `GET /api/health`: Returns current backend status, active model identifier, and database counts.
+
+### Configuration Management
+- `GET /api/config`: Retrieves public configuration details (keys are masked).
+- `POST /api/config`: Updates endpoints or credentials at runtime.
+- `POST /api/config/test`: Performs a live latency ping against the selected model endpoint.
+
+### Prescriptions and Analysis
+- `GET /api/samples`: Returns metadata and scenarios for built-in sample prescriptions.
+- `POST /api/analyze/stream`: Accepts multipart file upload; streams real-time NDJSON progress events through extraction, interaction checking, and timetable generation.
+- `POST /api/analyze-sample/{preset_id}/stream`: Runs the streaming analysis pipeline for a specified built-in sample prescription.
+- `POST /api/analyze`: Non-streaming synchronous analysis endpoint for uploaded prescription images.
+- `POST /api/analyze-sample/{preset_id}`: Non-streaming synchronous analysis endpoint for built-in samples.
+
+### Pharmacological Catalog
+- `GET /api/drugs`: Returns the verified drug dictionary including indications, contraindications, and brand-name cross references.
+
+---
+
+## Clinical Safety Disclaimer
+
+AushadhiDrishti is designed as an assistive medical technology demonstration and research prototype. It does not provide certified medical diagnoses, clinical prescriptions, or binding treatment plans. Automated outputs must be verified by a licensed healthcare professional before administering or altering any medication regimen.

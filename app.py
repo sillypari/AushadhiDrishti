@@ -3,7 +3,6 @@ import io
 import json
 import time
 import asyncio
-from urllib.parse import urlparse
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -56,6 +55,7 @@ async def health_check():
     return {
         "status": "online",
         "service": "AushadhiDrishti (औषधि दृष्टि)",
+        "active_provider": gemma_client.active,
         "gemma_model": gemma_client.model_name,
         "gemma_endpoint": gemma_client.api_base,
         "has_live_api_key": bool(gemma_client.api_key),
@@ -66,32 +66,35 @@ async def health_check():
 
 @app.get("/api/config")
 async def get_config():
-    """Returns the current API configuration (masking the API key for privacy)."""
-    masked_key = ""
-    if gemma_client.api_key:
-        masked_key = gemma_client.api_key[:4] + "..." + gemma_client.api_key[-4:] if len(gemma_client.api_key) > 8 else "***"
-    return {
-        "api_key_set": bool(gemma_client.api_key),
-        "masked_key": masked_key,
-        "api_base": gemma_client.api_base,
-        "model": gemma_client.model_name
-    }
+    """Returns provider configuration for the UI (API keys are masked)."""
+    return gemma_client.public_config()
 
 
 @app.post("/api/config")
 async def update_config(payload: dict):
-    """Allows updating Gemma API key, base URL, and model dynamically from the UI."""
-    api_key = payload.get("api_key")
-    api_base = payload.get("api_base")
-    model = payload.get("model")
-    
-    gemma_client.update_config(api_key=api_key, api_base=api_base, model=model)
-    return {
-        "status": "updated",
-        "api_key_set": bool(gemma_client.api_key),
-        "api_base": gemma_client.api_base,
-        "model": gemma_client.model_name
-    }
+    """
+    Updates one provider's settings and (by default) makes it the active provider.
+    Body: {provider, api_key?, api_base?, model?, activate?, failover?}
+    """
+    provider = str(payload.get("provider") or gemma_client.active).lower()
+    try:
+        gemma_client.configure(
+            provider,
+            api_key=payload.get("api_key"),
+            api_base=payload.get("api_base"),
+            model=payload.get("model"),
+            activate=bool(payload.get("activate", True)),
+            failover=payload.get("failover"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "updated", **gemma_client.public_config()}
+
+
+@app.post("/api/config/test")
+async def test_config(payload: dict):
+    """Checks that the stored key, endpoint and model for a provider actually work."""
+    return await gemma_client.ping(str(payload.get("provider") or gemma_client.active).lower())
 
 
 @app.get("/api/samples")
@@ -184,9 +187,7 @@ async def _analysis_events(raw_bytes: bytes, filename: str):
         yield _stage("enhance", "done", {**meta, "image_data_url": data_url})
 
         # Prescription reading (the slow step: send heartbeats so the UI shows live elapsed time)
-        engine_info = gemma_client.active_engine()
-        host = urlparse(gemma_client.api_base).netloc or gemma_client.api_base
-        yield _stage("vision", "active", {**engine_info, "host": host})
+        yield _stage("vision", "active", gemma_client.active_engine())
         extraction_task = asyncio.create_task(gemma_client.extract_prescription(processed_bytes, filename=filename))
         vision_started = time.perf_counter()
         while True:
@@ -201,7 +202,10 @@ async def _analysis_events(raw_bytes: bytes, filename: str):
         patient = raw.get("patient") if isinstance(raw.get("patient"), dict) else {}
         yield _stage("vision", "done", {
             "engine": extraction["engine"],
+            "provider": extraction["provider"],
+            "label": extraction["label"],
             "model": extraction["model"],
+            "attempts": extraction["attempts"],
             "fallback_reason": extraction["fallback_reason"],
             "elapsed": round(time.perf_counter() - vision_started, 1),
             "patient_name": patient.get("name"),
@@ -214,6 +218,8 @@ async def _analysis_events(raw_bytes: bytes, filename: str):
         # Interaction screening + enrichment
         yield _stage("screening", "active")
         analysis = await asyncio.to_thread(gemma_client.enrich, raw, extraction["source"])
+        analysis["engine"] = {"mode": extraction["engine"], "provider": extraction["provider"],
+                              "label": extraction["label"], "model": extraction["model"]}
         severities = [a.get("severity") for a in analysis["interactions"]]
         yield _stage("screening", "done", {
             **analysis["screening"],

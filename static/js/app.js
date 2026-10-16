@@ -25,7 +25,9 @@ const state = {
   speaking: false,
   samples: [],
   run: null,
-  view: 'input'
+  view: 'input',
+  config: null,
+  editProvider: null
 };
 let runSeq = 0;
 
@@ -39,7 +41,6 @@ const I18N = {
     themeDark: 'Dark mode',
     themeLight: 'Light mode',
     btnSettings: 'API settings',
-    heroPill: 'Gemma 4 multimodal vision',
     heroTitle: 'Read any prescription. Check it for unsafe combinations.',
     heroDesc: 'Upload a photo of a prescription to extract each medicine, screen for drug interactions, and get a daily timetable in English and Hindi.',
     dropTitle: 'Upload a prescription image',
@@ -80,7 +81,9 @@ const I18N = {
     kvContrast: 'Contrast',
     kvSharpness: 'Sharpness',
     kvOutput: 'Output',
-    vision_active_live: (model, host, s) => `Waiting for ${model} on ${host} (${s} s)`,
+    vision_active_live: (label, model, s) => `Waiting for ${label} (${model}) - ${s} s`,
+    vision_failover: (used, failed) => `Used ${used} after: ${failed}.`,
+    kvProvider: 'Provider',
     vision_active_offline: 'Preparing the offline engine',
     vision_slow: 'This is taking longer than usual. The model is still working.',
     vision_done_live: (n, s) => `${n} medicine${n === 1 ? '' : 's'} extracted in ${s} s`,
@@ -132,16 +135,25 @@ const I18N = {
     notInDb: 'Not in database',
     btnDownloadPDF: 'Print or save as PDF',
     btnScanNew: 'Scan another prescription',
-    sourceLive: 'Gemma 4',
+    sourceLive: 'Live model',
     sourceOffline: 'Offline engine',
     disclaimer: 'Medical disclaimer: AushadhiDrishti is an AI assistant for educational and informational use. Consult a licensed physician or pharmacist before starting, changing or stopping any medication.',
 
-    settingsTitle: 'Gemma 4 API configuration',
+    settingsTitle: 'Model configuration',
+    providerLabel: 'Provider',
+    lblFailover: 'If this provider fails, try the other one automatically',
+    btnTest: 'Test connection',
+    testing: 'Testing...',
+    testOk: (ms) => `Connected in ${ms} ms.`,
+    testFail: (m) => `Test failed: ${m}.`,
+    needKey: (label) => `Add an API key for ${label} to use it.`,
+    modelLine: (label, model) => `Reading with ${label} (${model})`,
+    modelOffline: 'Offline demo engine. No API key is configured.',
     lblApiKey: 'API key',
     lblApiBase: 'API base URL',
     lblModel: 'Model identifier',
-    settingsHint: 'Without an API key the app uses its built-in offline engine, which returns fixed demo data instead of reading the image.',
-    btnSaveConfig: 'Save',
+    settingsHint: 'Without any API key the app uses its built-in offline engine, which returns fixed demo data instead of reading the image.',
+    btnSaveConfig: 'Save and use',
     settingsSaved: 'Configuration saved.',
     settingsFailed: 'Could not save configuration.',
     keyConfigured: (k) => `Configured (${k})`,
@@ -153,7 +165,6 @@ const I18N = {
     themeDark: 'डार्क मोड',
     themeLight: 'लाइट मोड',
     btnSettings: 'API सेटिंग्स',
-    heroPill: 'Gemma 4 मल्टीमॉडल विज़न',
     heroTitle: 'किसी भी पर्चे को पढ़ें और असुरक्षित दवा संयोजन जांचें।',
     heroDesc: 'पर्चे की फोटो अपलोड करें। हर दवा पहचानी जाएगी, दवाओं के आपसी टकराव की जांच होगी और हिन्दी व अंग्रेज़ी में दैनिक समय-सारणी मिलेगी।',
     dropTitle: 'पर्चे की तस्वीर अपलोड करें',
@@ -194,7 +205,9 @@ const I18N = {
     kvContrast: 'कंट्रास्ट',
     kvSharpness: 'स्पष्टता',
     kvOutput: 'आउटपुट',
-    vision_active_live: (model, host, s) => `${host} पर ${model} के उत्तर की प्रतीक्षा (${s} सेकंड)`,
+    vision_active_live: (label, model, s) => `${label} (${model}) के उत्तर की प्रतीक्षा - ${s} सेकंड`,
+    vision_failover: (used, failed) => `${failed} के बाद ${used} उपयोग हुआ।`,
+    kvProvider: 'प्रदाता',
     vision_active_offline: 'ऑफ़लाइन इंजन तैयार किया जा रहा है',
     vision_slow: 'सामान्य से अधिक समय लग रहा है। मॉडल अभी काम कर रहा है।',
     vision_done_live: (n, s) => `${s} सेकंड में ${n} दवाएं निकाली गईं`,
@@ -246,16 +259,25 @@ const I18N = {
     notInDb: 'डेटाबेस में नहीं',
     btnDownloadPDF: 'प्रिंट करें या PDF सहेजें',
     btnScanNew: 'दूसरा पर्चा स्कैन करें',
-    sourceLive: 'Gemma 4',
+    sourceLive: 'लाइव मॉडल',
     sourceOffline: 'ऑफ़लाइन इंजन',
     disclaimer: 'चिकित्सा अस्वीकरण: औषधि दृष्टि एक एआई सहायक है जो केवल शैक्षिक और सूचनात्मक उपयोग के लिए है। कोई भी दवा शुरू करने, बदलने या बंद करने से पहले डॉक्टर या फार्मासिस्ट से परामर्श करें।',
 
-    settingsTitle: 'Gemma 4 API सेटिंग्स',
+    settingsTitle: 'मॉडल सेटिंग्स',
+    providerLabel: 'प्रदाता',
+    lblFailover: 'यह प्रदाता विफल हो तो दूसरा अपने आप आज़माएं',
+    btnTest: 'कनेक्शन जांचें',
+    testing: 'जांच हो रही है...',
+    testOk: (ms) => `${ms} मि.से. में कनेक्ट हुआ।`,
+    testFail: (m) => `जांच विफल: ${m}।`,
+    needKey: (label) => `${label} उपयोग करने के लिए API कुंजी जोड़ें।`,
+    modelLine: (label, model) => `${label} (${model}) से पढ़ा जाएगा`,
+    modelOffline: 'ऑफ़लाइन डेमो इंजन। कोई API कुंजी सेट नहीं है।',
     lblApiKey: 'API कुंजी',
     lblApiBase: 'API बेस URL',
     lblModel: 'मॉडल का नाम',
-    settingsHint: 'API कुंजी के बिना ऐप अपना ऑफ़लाइन इंजन चलाता है, जो तस्वीर पढ़ने के बजाय निश्चित डेमो डेटा लौटाता है।',
-    btnSaveConfig: 'सहेजें',
+    settingsHint: 'किसी भी API कुंजी के बिना ऐप अपना ऑफ़लाइन इंजन चलाता है, जो तस्वीर पढ़ने के बजाय निश्चित डेमो डेटा लौटाता है।',
+    btnSaveConfig: 'सहेजें और उपयोग करें',
     settingsSaved: 'सेटिंग्स सहेजी गईं।',
     settingsFailed: 'सेटिंग्स सहेजी नहीं जा सकीं।',
     keyConfigured: (k) => `कॉन्फ़िगर है (${k})`,
@@ -286,7 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'safety-banner', 'safety-icon', 'safety-title', 'safety-desc', 'summary-text', 'btn-audio-summary',
     'audio-icon', 'audio-label', 'interactions-list', 'schedule-morning', 'schedule-afternoon',
     'schedule-night', 'count-morning', 'count-afternoon', 'count-night', 'medications-cards',
-    'btn-scan-new', 'btn-print-card'
+    'btn-scan-new', 'btn-print-card',
+    'provider-switch', 'provider-tabs', 'btn-test', 'input-failover', 'model-line'
   ].forEach((id) => { el[id] = $(id); });
 
   applyTheme();
@@ -321,6 +344,7 @@ function setLanguage(lang) {
   });
   updateThemeLabel();
   updateAudioButton();
+  renderProviderUI();
   setBadge(el['scan-badge'].dataset.kind || 'scanning');
 
   if (state.samples.length) renderPresets();
@@ -382,7 +406,8 @@ function bindEvents() {
   el['btn-cancel'].addEventListener('click', resetToUpload);
   el['btn-error-back'].addEventListener('click', resetToUpload);
 
-  el['btn-settings-open'].addEventListener('click', () => { el['settings-status'].textContent = ''; el['modal-settings'].classList.add('active'); el['input-api-key'].focus(); });
+  el['btn-settings-open'].addEventListener('click', () => openSettings());
+  el['btn-test'].addEventListener('click', testConnection);
   el['btn-settings-close'].addEventListener('click', closeSettings);
   el['modal-settings'].addEventListener('click', (e) => { if (e.target === el['modal-settings']) closeSettings(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
@@ -391,34 +416,128 @@ function bindEvents() {
 
 function closeSettings() { el['modal-settings'].classList.remove('active'); }
 
-async function saveSettings(e) {
-  e.preventDefault();
-  const status = el['settings-status'];
-  status.className = 'form-status';
+/* ---- Provider configuration ---- */
+function providerOrder(cfg) {
+  const others = Object.keys(cfg.providers).filter((p) => p !== cfg.active);
+  return cfg.failover ? [cfg.active, ...others] : [cfg.active];
+}
+
+function updateModelLine() {
+  const cfg = state.config;
+  if (!cfg || !el['model-line']) return;
+  const pid = providerOrder(cfg).find((p) => cfg.providers[p].api_key_set);
+  el['model-line'].textContent = pid ? tr('modelLine', cfg.providers[pid].label, cfg.providers[pid].model) : tr('modelOffline');
+}
+
+function buildProviderButtons(container, selected, onPick) {
+  container.innerHTML = '';
+  Object.entries(state.config.providers).forEach(([id, p]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'segmented-btn' + (id === selected ? ' active' : '') + (p.api_key_set ? '' : ' no-key');
+    b.textContent = p.label;
+    b.title = p.api_key_set ? p.model : tr('needKey', p.label);
+    b.setAttribute('aria-pressed', String(id === selected));
+    b.addEventListener('click', () => onPick(id));
+    container.appendChild(b);
+  });
+}
+
+function renderProviderUI() {
+  if (!state.config) return;
+  buildProviderButtons(el['provider-switch'], state.config.active, switchProvider);
+  buildProviderButtons(el['provider-tabs'], state.editProvider, selectEditProvider);
+  updateModelLine();
+}
+
+async function postConfig(body) {
+  const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+  state.config = data;
+  renderProviderUI();
+}
+
+async function switchProvider(id) {
+  const p = state.config.providers[id];
+  if (!p.api_key_set) { openSettings(id, tr('needKey', p.label)); return; }
+  try { await postConfig({ provider: id, activate: true }); } catch (err) { console.error(err); }
+}
+
+function openSettings(provider, message) {
+  if (!state.config) return;
+  state.editProvider = provider || state.config.active;
+  fillSettingsForm();
+  setSettingsStatus(message || '', false);
+  renderProviderUI();
+  el['modal-settings'].classList.add('active');
+  el['input-api-key'].focus();
+}
+
+function selectEditProvider(id) {
+  state.editProvider = id;
+  fillSettingsForm();
+  setSettingsStatus('', false);
+  renderProviderUI();
+}
+
+function fillSettingsForm() {
+  const p = state.config.providers[state.editProvider];
+  el['input-api-key'].value = '';
+  el['input-api-key'].placeholder = p.api_key_set ? tr('keyConfigured', p.masked_key) : 'Paste your API key';
+  el['input-api-base'].value = p.api_base;
+  el['input-model'].value = p.model;
+  el['input-failover'].checked = state.config.failover;
+}
+
+function setSettingsStatus(text, isError) {
+  el['settings-status'].className = 'form-status' + (isError ? ' error' : '');
+  el['settings-status'].textContent = text;
+}
+
+function settingsPayload(activate) {
   const body = {
+    provider: state.editProvider,
     api_base: el['input-api-base'].value.trim(),
-    model: el['input-model'].value.trim()
+    model: el['input-model'].value.trim(),
+    failover: el['input-failover'].checked,
+    activate
   };
   const key = el['input-api-key'].value.trim();
-  if (key) body.api_key = key; // leave the stored key untouched when the field is blank
+  if (key) body.api_key = key; // a blank field keeps the stored key
+  return body;
+}
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const p = state.config.providers[state.editProvider];
+  if (!p.api_key_set && !el['input-api-key'].value.trim()) { setSettingsStatus(tr('needKey', p.label), true); return; }
   try {
-    const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (!res.ok) throw new Error(String(res.status));
-    el['input-api-key'].value = '';
-    status.textContent = tr('settingsSaved');
-    loadApiConfig();
-  } catch {
-    status.className = 'form-status error';
-    status.textContent = tr('settingsFailed');
+    await postConfig(settingsPayload(true));
+    closeSettings();
+  } catch (err) {
+    setSettingsStatus(tr('settingsFailed') + ' ' + err.message, true);
+  }
+}
+
+async function testConnection() {
+  setSettingsStatus(tr('testing'), false);
+  try {
+    await postConfig(settingsPayload(false)); // store what is typed, without switching providers
+    fillSettingsForm();
+    const res = await fetch('/api/config/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: state.editProvider }) });
+    const r = await res.json();
+    setSettingsStatus(r.ok ? tr('testOk', r.latency_ms) : tr('testFail', r.message), !r.ok);
+  } catch (err) {
+    setSettingsStatus(tr('testFail', err.message), true);
   }
 }
 
 async function loadApiConfig() {
   try {
-    const cfg = await (await fetch('/api/config')).json();
-    el['input-api-base'].value = cfg.api_base;
-    el['input-model'].value = cfg.model;
-    el['input-api-key'].placeholder = cfg.api_key_set ? tr('keyConfigured', cfg.masked_key) : 'Paste your API key';
+    state.config = await (await fetch('/api/config')).json();
+    state.editProvider = state.config.active;
+    renderProviderUI();
   } catch (err) {
     console.error('Failed to load config:', err);
   }
@@ -694,7 +813,7 @@ function setStage(run, id, status, data) {
       if (data.image_data_url) { el['scan-image'].src = data.image_data_url; el['scan-image'].hidden = false; }
     }
     if (id === 'upload' && data.size_bytes != null) run.meta.size = data.size_bytes;
-    if (id === 'vision' && data.model) run.meta.model = data.model;
+    if (id === 'vision' && data.model) run.meta.model = data.label ? `${data.label} / ${data.model}` : data.model;
     renderMeta(run);
   }
   renderStage(run, id);
@@ -747,10 +866,12 @@ function stageDetail(run, id, st) {
         const secs = (performance.now() - st.t0) / 1000;
         if (!d.engine) return '';
         if (d.engine === 'offline') return tr('vision_active_offline');
-        return secs > 25 ? tr('vision_slow') : tr('vision_active_live', d.model, d.host, secs.toFixed(0));
+        return secs > 25 ? tr('vision_slow') : tr('vision_active_live', d.label, d.model, secs.toFixed(0));
       }
       const n = (d.medications || []).length;
-      return d.engine === 'offline' ? tr('vision_done_offline', n, d.fallback_reason || '-') : tr('vision_done_live', n, d.elapsed);
+      if (d.engine === 'offline') return tr('vision_done_offline', n, d.fallback_reason || '-');
+      const failed = (d.attempts || []).map((a) => `${a.label}: ${a.error}`).join('; ');
+      return tr('vision_done_live', n, d.elapsed) + (failed ? ' ' + tr('vision_failover', d.label, failed) : '');
     }
     case 'screening':
       if (st.status === 'active') return tr('screening_active');
@@ -772,7 +893,7 @@ function stageBody(id, st) {
   }
   if (id === 'vision') {
     if (st.status === 'active' && d.engine === 'live') {
-      return `<div class="kv-row">${kv(tr('kvModel'), d.model)}${kv(tr('kvEndpoint'), d.host)}</div>`;
+      return `<div class="kv-row">${kv(tr('kvProvider'), d.label)}${kv(tr('kvModel'), d.model)}${kv(tr('kvEndpoint'), d.host)}</div>`;
     }
     if (st.status === 'done' || st.status === 'warn') {
       const chips = (d.medications || []).map((m, i) => `
@@ -830,9 +951,10 @@ function renderAnalysis(data, { animate }) {
   el['patient-doctor'].textContent = p.doctor || tr('unspecified');
   el['patient-date'].textContent = p.date || tr('unspecified');
 
-  const offline = /offline/i.test(a.source || '');
+  const eng = a.engine || {};
+  const offline = eng.mode ? eng.mode === 'offline' : /offline/i.test(a.source || '');
   el['source-tag'].className = 'badge ' + (offline ? 'badge-caution' : 'badge-accent');
-  el['source-tag'].textContent = tr(offline ? 'sourceOffline' : 'sourceLive');
+  el['source-tag'].textContent = offline ? tr('sourceOffline') : (eng.label || tr('sourceLive'));
 
   const safety = a.safety || { level: 'safe' };
   el['safety-banner'].className = `safety-banner ${safety.level}`;
@@ -848,7 +970,7 @@ function renderAnalysis(data, { animate }) {
   renderMedicationCards(a.medications || [], hi);
 
   view.querySelectorAll('.reveal').forEach((n, i) => n.style.setProperty('--i', i + 1));
-  view.querySelectorAll('.med-card').forEach((n, i) => n.style.setProperty('--i', i));
+  view.querySelectorAll('.med-item').forEach((n, i) => n.style.setProperty('--i', i));
 }
 
 const sentenceCase = (s, hi) => {
@@ -860,20 +982,27 @@ const sentenceCase = (s, hi) => {
 function renderInteractions(list, hi) {
   const box = el['interactions-list'];
   if (!list.length) {
-    box.innerHTML = `<div class="interaction none">${esc(tr('noInteractions'))}</div>`;
+    box.innerHTML = `<p class="interaction-none"><svg width="18" height="18" aria-hidden="true"><use href="#i-check-circle"/></svg>${esc(tr('noInteractions'))}</p>`;
     return;
   }
-  const sev = { contraindicated: 'sevContraindicated', major: 'sevMajor', moderate: 'sevModerate' };
-  box.innerHTML = list.map((ix, i) => `
-    <div class="interaction ${esc(ix.severity)}" style="--i:${i}">
+  const sev = {
+    contraindicated: ['sevContraindicated', 'badge-danger'],
+    major: ['sevMajor', 'badge-caution'],
+    moderate: ['sevModerate', 'badge-moderate']
+  };
+  box.innerHTML = list.map((ix, i) => {
+    const [key, cls] = sev[ix.severity] || sev.moderate;
+    return `
+    <div class="interaction" style="--i:${i}">
       <div class="interaction-head">
+        <span class="badge ${cls}">${esc(tr(key))}</span>
         <span class="interaction-title">${esc(hi ? ix.title_hi : ix.title_en)}</span>
-        <span class="interaction-sev">${esc(tr(sev[ix.severity] || 'sevModerate'))}</span>
       </div>
       <div class="interaction-drugs">${esc((ix.drugs || []).join(' + ').toUpperCase())}</div>
       <p class="interaction-desc">${esc(hi ? ix.description_hi : ix.description_en)}</p>
       <p class="interaction-action"><span>${esc(tr('recommended'))}</span> ${esc(hi ? ix.action_hi : ix.action_en)}</p>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 /* Reads "1-0-1" style schedules first, then falls back to common abbreviations and words. */
@@ -909,24 +1038,24 @@ function renderSchedule(meds, hi) {
 
 function renderMedicationCards(meds, hi) {
   el['medications-cards'].innerHTML = meds.map((m) => `
-    <article class="med-card">
-      <div class="med-card-head">
+    <article class="med-item">
+      <div class="med-item-head">
         <div>
           <h4>${esc(m.generic_name || m.raw_name)}</h4>
           <span class="med-category">${esc(hi ? m.category_hi : m.category_en)}</span>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+        <div class="med-tags">
           ${m.identified ? '' : `<span class="badge badge-caution">${esc(tr('notInDb'))}</span>`}
-          <span class="med-dose">${esc(m.dosage || '-')}</span>
+          <span class="badge">${esc(m.dosage || '-')}</span>
         </div>
       </div>
-      <dl class="med-grid">
-        <div class="med-field"><dt>${esc(tr('lblDosage'))}</dt><dd>${esc(hi ? m.frequency_hi : m.frequency)}</dd></div>
-        <div class="med-field"><dt>${esc(tr('lblTiming'))}</dt><dd>${esc(hi ? m.timing_hi : m.timing_en)}</dd></div>
-        <div class="med-field"><dt>${esc(tr('lblDuration'))}</dt><dd>${esc(m.duration || '-')}</dd></div>
-        <div class="med-field"><dt>${esc(tr('lblUses'))}</dt><dd>${esc(hi ? m.uses_hi : m.uses_en)}</dd></div>
+      <dl class="med-facts">
+        <div><dt>${esc(tr('lblDosage'))}</dt><dd>${esc(hi ? m.frequency_hi : m.frequency)}</dd></div>
+        <div><dt>${esc(tr('lblTiming'))}</dt><dd>${esc(hi ? m.timing_hi : m.timing_en)}</dd></div>
+        <div><dt>${esc(tr('lblDuration'))}</dt><dd>${esc(m.duration || '-')}</dd></div>
+        <div class="wide"><dt>${esc(tr('lblUses'))}</dt><dd>${esc(hi ? m.uses_hi : m.uses_en)}</dd></div>
       </dl>
-      <div class="med-warning"><strong>${esc(tr('lblWarnings'))}</strong> ${esc(hi ? m.warnings_hi : m.warnings_en)}</div>
+      <p class="med-warning"><strong>${esc(tr('lblWarnings'))}</strong> ${esc(hi ? m.warnings_hi : m.warnings_en)}</p>
     </article>`).join('');
 }
 
