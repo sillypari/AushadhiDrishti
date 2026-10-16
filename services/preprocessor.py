@@ -32,7 +32,8 @@ def preprocess_prescription_image(image_bytes: bytes, max_dimension: int = 1400)
     if max(w, h) > max_dimension:
         ratio = max_dimension / max(w, h)
         new_size = (int(w * ratio), int(h * ratio))
-        img = img.resize(new_size, Image.Resampling.LANCZOS)
+        resample = getattr(Image, "Resampling", Image).LANCZOS if hasattr(Image, "Resampling") else getattr(Image, "LANCZOS", 1)
+        img = img.resize(new_size, resample)
 
     # Enhance contrast to make faint ink / pen strokes pop
     contrast_enhancer = ImageEnhance.Contrast(img)
@@ -87,7 +88,7 @@ def generate_sample_prescription(preset_id: str = "cardio_diabetic") -> Tuple[by
     draw.text((260, 480), "AUSHADHI DRISHTI DEMO Rx", fill="#f1f5f9", font=font)
 
     # Patient Details Strip
-    draw.rectangle([40, 150, width - 40, 220], outline="#cbd5e1", width=1, fill="#f8fafc")
+    draw.rectangle([40, 150, width - 40, 220], outline="#cbd5e1", fill="#f8fafc")
     if preset_id == "cardio_diabetic":
         p_name = "Patient: Rajesh Kumar Sharma (M/54 yrs)    UHID: SJH-88219"
         p_vitals = "BP: 138/88 mmHg  |  HbA1c: 7.8%  |  Weight: 76 kg  |  Date: Today"
@@ -136,7 +137,7 @@ def generate_sample_prescription(preset_id: str = "cardio_diabetic") -> Tuple[by
 
     # Footer Advice & Signature
     y_footer = height - 230
-    draw.rectangle([40, y_footer, width - 40, y_footer + 70], fill="#f0fdf4", outline="#bbf7d0", width=1)
+    draw.rectangle([40, y_footer, width - 40, y_footer + 70], fill="#f0fdf4", outline="#bbf7d0")
     draw.text((60, y_footer + 15), advice, fill="#166534", font=font)
     draw.text((60, y_footer + 40), "Emergency Contact: Sanjeevani ER 011-2659-8899", fill="#15803d", font=font)
 
