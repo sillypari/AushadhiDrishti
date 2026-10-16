@@ -184,6 +184,40 @@ MEAL_TIMING_RULES: Dict[str, Dict[str, Any]] = {
     }
 }
 
+# Standard clinical treatment duration guidelines (in days)
+TREATMENT_DURATION_GUIDELINES: Dict[str, Dict[str, Any]] = {
+    "azithromycin": {
+        "max_recommended_days": 5,
+        "warning_threshold_days": 3,
+        "category": "Antimicrobial Stewardship",
+        "notes": "Standard respiratory/soft-tissue course is 3-5 days. Prolonged therapy risks bacterial resistance and cardiac arrhythmias."
+    },
+    "amoxicillin": {
+        "max_recommended_days": 14,
+        "warning_threshold_days": 10,
+        "category": "Antimicrobial Stewardship",
+        "notes": "Typical course is 5-10 days. Courses exceeding 14 days require clinical re-evaluation."
+    },
+    "ciprofloxacin": {
+        "max_recommended_days": 14,
+        "warning_threshold_days": 10,
+        "category": "Fluoroquinolone Stewardship",
+        "notes": "Limit duration to minimum necessary; prolonged exposure increases tendonitis and neuropathy risk."
+    },
+    "ibuprofen": {
+        "max_recommended_days": 10,
+        "warning_threshold_days": 7,
+        "category": "Acute Analgesia",
+        "notes": "OTC pain therapy should not exceed 7-10 consecutive days without physician reassessment for underlying pathology."
+    },
+    "paracetamol": {
+        "max_recommended_days": 7,
+        "warning_threshold_days": 5,
+        "category": "Antipyretic / Analgesic",
+        "notes": "Continuous unmonitored antipyretic therapy exceeding 5 days necessitates medical investigation of persistent pyrexia."
+    }
+}
+
 
 def parse_dosage_value(dosage_str: str) -> Optional[float]:
     """Extract numeric dosage value in milligrams from strings like '500 mg', '0.5g', '100 mcg'."""
@@ -251,6 +285,47 @@ def parse_liquid_volume_ml(dosage_str: str) -> Optional[float]:
     if tbsp_match:
         qty = float(tbsp_match.group(1)) if tbsp_match.group(1) else 1.0
         return qty * 15.0
+
+    return None
+
+
+def parse_duration_days(duration_str: str) -> Optional[int]:
+    """Converts natural language duration text (e.g., '5 days', '2 weeks', '1 month') into days."""
+    if not duration_str:
+        return None
+    cleaned = duration_str.strip().lower()
+
+    # Weeks
+    w_match = re.search(r"([\d.]+)\s*(?:week|wk|wks)", cleaned)
+    if w_match:
+        try:
+            return int(float(w_match.group(1)) * 7)
+        except ValueError:
+            pass
+
+    # Months
+    m_match = re.search(r"([\d.]+)\s*(?:month|mo|mos)", cleaned)
+    if m_match:
+        try:
+            return int(float(m_match.group(1)) * 30)
+        except ValueError:
+            pass
+
+    # Days
+    d_match = re.search(r"([\d.]+)\s*(?:day|days|d\b)", cleaned)
+    if d_match:
+        try:
+            return int(float(d_match.group(1)))
+        except ValueError:
+            pass
+
+    # Generic leading digit
+    num_match = re.search(r"^(\d+)", cleaned)
+    if num_match:
+        try:
+            return int(num_match.group(1))
+        except ValueError:
+            pass
 
     return None
 
@@ -401,6 +476,46 @@ def validate_administration_timing(
     }
 
 
+def validate_treatment_duration(
+    drug_canonical_name: str,
+    duration_str: str
+) -> Dict[str, Any]:
+    """Audits duration against antimicrobial stewardship and clinical safety standards."""
+    key = drug_canonical_name.strip().lower()
+    guideline = TREATMENT_DURATION_GUIDELINES.get(key)
+    days = parse_duration_days(duration_str)
+
+    if not guideline or days is None:
+        return {
+            "status": "unverified",
+            "prescribed_days": days,
+            "message": f"No duration ceiling cataloged for {drug_canonical_name}."
+        }
+
+    status = "safe"
+    flags = []
+
+    if days > guideline["max_recommended_days"]:
+        status = "exceeded"
+        flags.append(
+            f"Prescribed duration ({days} days) exceeds guideline maximum of {guideline['max_recommended_days']} days. {guideline['notes']}"
+        )
+    elif days >= guideline["warning_threshold_days"]:
+        status = "warning"
+        flags.append(
+            f"Prescribed duration ({days} days) reaches recommended review threshold. {guideline['notes']}"
+        )
+
+    return {
+        "drug": drug_canonical_name,
+        "status": status,
+        "prescribed_days": days,
+        "max_recommended_days": guideline["max_recommended_days"],
+        "category": guideline["category"],
+        "flags": flags
+    }
+
+
 def generate_bilingual_dosage_advisory(audit: Dict[str, Any], lang: str = "en") -> str:
     """Generates localized patient-friendly advisory text for UI cards or Voice TTS."""
     status = audit.get("status", "safe")
@@ -428,13 +543,14 @@ def generate_bilingual_dosage_advisory(audit: Dict[str, Any], lang: str = "en") 
 
 
 def batch_validate_prescriptions(medications: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Audits an entire prescription regimen for dosage range compliance.
+    """Audits an entire prescription regimen for dosage range and duration compliance.
     
     Args:
-        medications: List of medication dicts containing at least:
+        medications: List of medication dicts containing:
                      - 'name' or 'medicine_name'
                      - 'dosage' (e.g. '500 mg')
                      - 'frequency' (e.g. '1-0-1')
+                     - 'duration' (optional, e.g. '5 days')
                      
     Returns:
         Structured batch validation summary with counts and per-medication findings.
@@ -447,19 +563,26 @@ def batch_validate_prescriptions(medications: List[Dict[str, Any]]) -> Dict[str,
         name = med.get("name") or med.get("medicine_name") or med.get("drug") or ""
         dosage = med.get("dosage", "")
         frequency = med.get("frequency", "")
+        duration = med.get("duration", "")
 
         audit = validate_dosage_safety(name, dosage, frequency)
-        if audit["status"] == "exceeded":
+        duration_audit = validate_treatment_duration(name, duration) if duration else None
+
+        if audit["status"] == "exceeded" or (duration_audit and duration_audit["status"] == "exceeded"):
             has_exceeded = True
-        elif audit["status"] == "warning":
+        elif audit["status"] == "warning" or (duration_audit and duration_audit["status"] == "warning"):
             has_warning = True
 
-        results.append({
+        entry: Dict[str, Any] = {
             "medication": name,
             "prescribed_dosage": dosage,
             "frequency": frequency,
             "audit": audit
-        })
+        }
+        if duration_audit:
+            entry["duration_audit"] = duration_audit
+
+        results.append(entry)
 
     overall_status = "exceeded" if has_exceeded else ("warning" if has_warning else "safe")
 
