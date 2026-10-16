@@ -27,3 +27,13 @@ Desktop.ini
 .vscode/
 *.swp
 *.swo
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Diagnostics & benchmarks
+benchmark_*.json
+
