@@ -1,0 +1,407 @@
+{
+  "paracetamol": {
+    "generic": "Paracetamol (Acetaminophen)",
+    "brand_names": ["Dolo 650", "Calpol", "Crocin", "Tylenol", "Pacimol"],
+    "category": {
+      "en": "Analgesic & Antipyretic (Pain & Fever)",
+      "hi": "दर्द निवारक एवं ज्वरनाशक (दर्द और बुखार)"
+    },
+    "default_dosage": "650mg",
+    "timing": {
+      "en": "After food or when required (SOS)",
+      "hi": "भोजन के बाद या आवश्यकतानुसार"
+    },
+    "schedule": "1-0-1 (Morning & Night)",
+    "schedule_hi": "1-0-1 (सुबह एवं रात)",
+    "uses": {
+      "en": "Relief of mild to moderate fever, headaches, body ache, and toothache.",
+      "hi": "हल्के से मध्यम बुखार, सिरदर्द, बदन दर्द और दांत दर्द से राहत।"
+    },
+    "warnings": {
+      "en": "Do not exceed 4000mg (4 grams) in 24 hours. Avoid alcohol to protect liver.",
+      "hi": "24 घंटे में 4000 मि.ग्रा. से अधिक न लें। लिवर सुरक्षा हेतु शराब से बचें।"
+    },
+    "side_effects": {
+      "en": "Rare: Nausea, allergic skin rash if overdosed.",
+      "hi": "दुर्लभ: मतली, अधिक मात्रा में त्वचा पर लाल चकत्ते।"
+    }
+  },
+  "metformin": {
+    "generic": "Metformin Hydrochloride",
+    "brand_names": ["Glycomet", "Glucophage", "Obimet", "Zomet", "Bigomet"],
+    "category": {
+      "en": "Antidiabetic (Biguanide)",
+      "hi": "मधुमेह रोधी दवा (एंटी-डायबिटिक)"
+    },
+    "default_dosage": "500mg",
+    "timing": {
+      "en": "Take with meals or immediately after meals",
+      "hi": "भोजन के साथ या भोजन के तुरंत बाद लें"
+    },
+    "schedule": "1-0-1 (With Breakfast & Dinner)",
+    "schedule_hi": "1-0-1 (नाश्ते और रात के खाने के साथ)",
+    "uses": {
+      "en": "Controls high blood sugar levels in patients with Type 2 Diabetes Mellitus.",
+      "hi": "टाइप 2 मधुमेह के रोगियों में रक्त शर्करा (शुगर) को नियंत्रित करता है।"
+    },
+    "warnings": {
+      "en": "Risk of lactic acidosis. Drink plenty of water. Monitor kidney function regularly.",
+      "hi": "लैक्टिक एसिडोसिस का जोखिम। पर्याप्त पानी पिएं। किडनी की नियमित जांच करवाएं।"
+    },
+    "side_effects": {
+      "en": "Mild stomach upset, metallic taste, nausea during initial days.",
+      "hi": "पेट में हल्की गड़बड़ी, मुंह में धातु जैसा स्वाद, शुरुआती दिनों में मतली।"
+    }
+  },
+  "atorvastatin": {
+    "generic": "Atorvastatin Calcium",
+    "brand_names": ["Atorva", "Lipitor", "Storvas", "Tonact", "Atocor"],
+    "category": {
+      "en": "Statin (Lipid-Lowering Agent)",
+      "hi": "कोलेस्ट्रॉल कम करने वाली दवा (स्टेटिन)"
+    },
+    "default_dosage": "10mg / 20mg",
+    "timing": {
+      "en": "Take once daily at bedtime, with or without food",
+      "hi": "दिन में एक बार रात को सोते समय, भोजन के साथ या बिना लें"
+    },
+    "schedule": "0-0-1 (Bedtime)",
+    "schedule_hi": "0-0-1 (सोते समय)",
+    "uses": {
+      "en": "Lowers bad cholesterol (LDL) and triglycerides; prevents heart attack and stroke.",
+      "hi": "खराब कोलेस्ट्रॉल (LDL) और ट्राइग्लिसराइड्स कम करता है; दिल के दौरे से बचाव।"
+    },
+    "warnings": {
+      "en": "Avoid consuming grapefruit or grapefruit juice. Report unexplained muscle aches.",
+      "hi": "चकोतरा (ग्रेपफ्रूट) खाने से बचें। मांसपेशियों में असामान्य दर्द होने पर तुरंत डॉक्टर को बताएं।"
+    },
+    "side_effects": {
+      "en": "Muscle soreness, joint pain, mild digestive changes.",
+      "hi": "मांसपेशियों में हल्का दर्द, जोड़ों का दर्द, पाचन में बदलाव।"
+    }
+  },
+  "aspirin": {
+    "generic": "Aspirin (Acetylsalicylic Acid)",
+    "brand_names": ["Ecosprin", "Disprin", "Bayer", "ASA", "Delisprin"],
+    "category": {
+      "en": "Antiplatelet / Blood Thinner",
+      "hi": "रक्त पतला करने वाली दवा (एंटी-प्लेटलेट)"
+    },
+    "default_dosage": "75mg / 150mg",
+    "timing": {
+      "en": "Take after a full meal to avoid gastric irritation",
+      "hi": "पेट की जलन से बचने के लिए भोजन के बाद लें"
+    },
+    "schedule": "0-1-0 (After Lunch) or 1-0-0",
+    "schedule_hi": "0-1-0 (दोपहर के भोजन के बाद) या 1-0-0",
+    "uses": {
+      "en": "Prevents blood clots, reducing risk of cardiac events in heart patients.",
+      "hi": "खून के थक्के जमने से रोकता है, हृदय रोगियों में हार्ट अटैक के खतरे को घटाता है।"
+    },
+    "warnings": {
+      "en": "Increased risk of bleeding. Inform dentist or surgeon prior to procedures. Avoid with ulcers.",
+      "hi": "रक्तस्राव (ब्लीडिंग) का खतरा। किसी भी सर्जरी से पहले डॉक्टर को सूचित करें। अल्सर में न लें।"
+    },
+    "side_effects": {
+      "en": "Heartburn, easy bruising, mild stomach discomfort.",
+      "hi": "सीने में जलन, शरीर पर नीले निशान पड़ना, पेट में भारीपन।"
+    }
+  },
+  "pantoprazole": {
+    "generic": "Pantoprazole Sodium",
+    "brand_names": ["Pan 40", "Pantocid", "Pantosec", "Protonix", "Pan-D"],
+    "category": {
+      "en": "Proton Pump Inhibitor (Antacid / Anti-Ulcer)",
+      "hi": "एसिडिटी और अल्सर रोधी दवा (पीपीआई)"
+    },
+    "default_dosage": "40mg",
+    "timing": {
+      "en": "Take 30 to 60 minutes BEFORE morning breakfast on an empty stomach",
+      "hi": "सुबह नाश्ते से 30 से 60 मिनट पूर्व खाली पेट लें"
+    },
+    "schedule": "1-0-0 (Empty Stomach Morning)",
+    "schedule_hi": "1-0-0 (सुबह खाली पेट)",
+    "uses": {
+      "en": "Treats GERD, acid reflux, stomach acidity, and protects stomach lining from pain killers.",
+      "hi": "गैस, एसिड रिफ्लक्स, सीने में जलन और दर्दनिवारक दवाओं से पेट की सुरक्षा करता है।"
+    },
+    "warnings": {
+      "en": "Swallow whole with water; do not crush or chew. Long-term use requires B12 & Calcium checks.",
+      "hi": "गोली को पानी के साथ पूरा निगलें, चबाएं नहीं। लंबे समय तक लेने पर विटामिन B12 की जांच कराएं।"
+    },
+    "side_effects": {
+      "en": "Headache, diarrhea, mild dizziness.",
+      "hi": "हल्का सिरदर्द, दस्त, चक्कर आना।"
+    }
+  },
+  "amoxicillin": {
+    "generic": "Amoxicillin / Amox-Clav",
+    "brand_names": ["Augmentin", "Mox 500", "Amoxyclav", "Novamox", "Clamp"],
+    "category": {
+      "en": "Penicillin Antibiotic",
+      "hi": "एंटीबायोटिक (संक्रमण रोधी)"
+    },
+    "default_dosage": "500mg / 625mg",
+    "timing": {
+      "en": "Take with meals or after food to prevent stomach upset",
+      "hi": "पेट की परेशानी से बचने हेतु भोजन के साथ या बाद में लें"
+    },
+    "schedule": "1-0-1 (Every 12 hours for 5 days)",
+    "schedule_hi": "1-0-1 (हर 12 घंटे में 5 दिनों तक)",
+    "uses": {
+      "en": "Fights bacterial infections of respiratory tract, throat, ear, and urinary tract.",
+      "hi": "गले, कान, फेफड़े और मूत्र मार्ग के जीवाणु (बैक्टीरियल) संक्रमण का इलाज करता है।"
+    },
+    "warnings": {
+      "en": "CRITICAL: Complete the full course even if feeling better to avoid antibiotic resistance.",
+      "hi": "चेतावनी: ठीक लगने पर भी कोर्स बीच में न छोड़ें, ताकि बैक्टीरिया प्रतिरोधी न बनें।"
+    },
+    "side_effects": {
+      "en": "Mild loose stools, stomach cramps, nausea.",
+      "hi": "हल्के दस्त, पेट में मरोड़, उल्टी जैसा लगना।"
+    }
+  },
+  "azithromycin": {
+    "generic": "Azithromycin",
+    "brand_names": ["Azithral", "Azee", "Zithromax", "Azimax"],
+    "category": {
+      "en": "Macrolide Antibiotic",
+      "hi": "मैक्रोलाइड एंटीबायोटिक"
+    },
+    "default_dosage": "500mg",
+    "timing": {
+      "en": "Take once daily, 1 hour before or 2 hours after food",
+      "hi": "दिन में एक बार, भोजन से 1 घंटा पहले या 2 घंटे बाद लें"
+    },
+    "schedule": "1-0-0 (Once daily for 3 to 5 days)",
+    "schedule_hi": "1-0-0 (दिन में 1 बार 3 से 5 दिनों के लिए)",
+    "uses": {
+      "en": "Used for chest infections, tonsillitis, sinus infections, and skin infections.",
+      "hi": "छाती के संक्रमण, टॉन्सिल, साइनस और त्वचा के संक्रमण के उपचार में प्रयुक्त।"
+    },
+    "warnings": {
+      "en": "Take at the exact same time every day. Complete the prescribed 3 or 5 day regimen.",
+      "hi": "प्रतिदिन एक निश्चित समय पर लें। निर्धारित 3 या 5 दिनों का कोर्स पूरा करें।"
+    },
+    "side_effects": {
+      "en": "Loose motions, stomach ache, temporary altered taste.",
+      "hi": "पतले दस्त, पेट में दर्द, स्वाद में हल्का बदलाव।"
+    }
+  },
+  "losartan": {
+    "generic": "Losartan Potassium",
+    "brand_names": ["Repace", "Losacar", "Cozaar", "Alsartan"],
+    "category": {
+      "en": "Angiotensin II Receptor Blocker (Blood Pressure)",
+      "hi": "उच्च रक्तचाप नियंत्रण (बीपी की दवा)"
+    },
+    "default_dosage": "25mg / 50mg",
+    "timing": {
+      "en": "Take once daily in the morning, with or without food",
+      "hi": "रोजाना सुबह एक बार, भोजन के साथ अथवा बिना लें"
+    },
+    "schedule": "1-0-0 (Morning)",
+    "schedule_hi": "1-0-0 (सुबह)",
+    "uses": {
+      "en": "Treats hypertension (high blood pressure) and protects kidneys in diabetics.",
+      "hi": "हाई ब्लड प्रेशर को कम करता है और डायबिटिक मरीजों में गुर्दे की सुरक्षा करता है।"
+    },
+    "warnings": {
+      "en": "Do not stand up too quickly from sitting position (postural dizziness). Monitor potassium.",
+      "hi": "अचानक तेजी से न उठें (चक्कर आ सकते हैं)। पोटेशियम स्तर की जांच कराएं।"
+    },
+    "side_effects": {
+      "en": "Lightheadedness, fatigue, nasal congestion.",
+      "hi": "हल्का सिर घूमना, थकान, नाक बंद होना।"
+    }
+  },
+  "telmisartan": {
+    "generic": "Telmisartan",
+    "brand_names": ["Telma 40", "Micardis", "Telpres", "Telsartan"],
+    "category": {
+      "en": "Antihypertensive (ARB)",
+      "hi": "रक्तचाप नियंत्रक दवा"
+    },
+    "default_dosage": "40mg",
+    "timing": {
+      "en": "Take at fixed time in morning with water",
+      "hi": "सुबह एक निश्चित समय पर पानी के साथ लें"
+    },
+    "schedule": "1-0-0 (Morning)",
+    "schedule_hi": "1-0-0 (सुबह)",
+    "uses": {
+      "en": "Long-acting control of hypertension and cardiovascular risk reduction.",
+      "hi": "हाई बीपी का 24 घंटे नियंत्रण और दिल के रोगों के खतरे में कमी।"
+    },
+    "warnings": {
+      "en": "Contraindicated in pregnancy. Keep hydrated in warm weather.",
+      "hi": "गर्भावस्था में सख्त वर्जित। गर्मी के मौसम में पर्याप्त पानी पिएं।"
+    },
+    "side_effects": {
+      "en": "Dizziness, back pain, sinus discomfort.",
+      "hi": "चक्कर आना, पीठ दर्द, साइनस में भारीपन।"
+    }
+  },
+  "ibuprofen": {
+    "generic": "Ibuprofen",
+    "brand_names": ["Brufen", "Advil", "Combiflam (with Paracetamol)", "Ibugesic"],
+    "category": {
+      "en": "NSAID (Non-Steroidal Anti-Inflammatory)",
+      "hi": "गैर-स्टेरॉयडल सूजन व दर्द निवारक"
+    },
+    "default_dosage": "400mg",
+    "timing": {
+      "en": "Strictly take with food or milk to safeguard stomach lining",
+      "hi": "पेट की सुरक्षा हेतु भोजन या दूध के साथ ही लें"
+    },
+    "schedule": "1-0-1 (After Food as needed)",
+    "schedule_hi": "1-0-1 (भोजन के बाद आवश्यकतानुसार)",
+    "uses": {
+      "en": "Reduces joint pain, arthritis swelling, dental pain, and muscular inflammation.",
+      "hi": "जोड़ों के दर्द, गठिया की सूजन, दांत दर्द और मांसपेशियों के खिंचाव को ठीक करता है।"
+    },
+    "warnings": {
+      "en": "Do not take with other NSAIDs or Aspirin. Avoid if you have kidney disease or gastric ulcers.",
+      "hi": "एस्पिरिन या अन्य दर्दनिवारक के साथ न लें। अल्सर या किडनी रोग में सख्त मना।"
+    },
+    "side_effects": {
+      "en": "Acidity, stomach burning, fluid retention.",
+      "hi": "एसिडिटी, पेट में जलन, शरीर में सूजन।"
+    }
+  },
+  "warfarin": {
+    "generic": "Warfarin Sodium",
+    "brand_names": ["Coumadin", "Warf", "Uniwarf"],
+    "category": {
+      "en": "Anticoagulant (Blood Thinner)",
+      "hi": "खून पतला करने वाली दवा (एंटी-कोगुलेंट)"
+    },
+    "default_dosage": "2mg / 5mg",
+    "timing": {
+      "en": "Take once daily in evening, exactly at prescribed dose",
+      "hi": "शाम को एक बार, डॉक्टर द्वारा निर्धारित सटीक मात्रा में लें"
+    },
+    "schedule": "0-0-1 (Evening as monitored by INR)",
+    "schedule_hi": "0-0-1 (शाम को INR रिपोर्ट के अनुसार)",
+    "uses": {
+      "en": "Prevents dangerous blood clots in deep veins, pulmonary embolism, and atrial fibrillation.",
+      "hi": "नसों में जानलेवा थक्के जमने, फेफड़ों में क्लॉट और हृदय गति की अनियमितता में रोकथाम।"
+    },
+    "warnings": {
+      "en": "HIGH ALERT MEDICATION. Requires regular INR blood tests. High risk of hemorrhage when mixed with pain killers.",
+      "hi": "अत्यंत सतर्कता वाली दवा! नियमित INR रक्त जांच आवश्यक। पेनकिलर के साथ ब्लीडिंग का भारी खतरा।"
+    },
+    "side_effects": {
+      "en": "Prolonged bleeding from minor cuts, bleeding gums, dark stools.",
+      "hi": "छोटे कट से भी ज्यादा खून बहना, मसूड़ों से खून, काला मल।"
+    }
+  },
+  "cetirizine": {
+    "generic": "Cetirizine Hydrochloride",
+    "brand_names": ["Cetzine", "Zyrtec", "Alerid", "Okacet"],
+    "category": {
+      "en": "Antihistamine (Allergy & Cold)",
+      "hi": "एलर्जी और जुकाम रोधी दवा (एंटी-हिस्टामिन)"
+    },
+    "default_dosage": "10mg",
+    "timing": {
+      "en": "Take at night before sleep, with water",
+      "hi": "रात को सोने से पहले पानी के साथ लें"
+    },
+    "schedule": "0-0-1 (Night)",
+    "schedule_hi": "0-0-1 (रात को सोते समय)",
+    "uses": {
+      "en": "Relieves sneezing, runny nose, allergic itching, hives, and watery eyes.",
+      "hi": "छींकने, बहती नाक, एलर्जी की खुजली, पित्ती (hives) और आंखों से पानी आने में राहत।"
+    },
+    "warnings": {
+      "en": "May cause drowsiness. Avoid driving or operating machinery after taking.",
+      "hi": "नींद और सुस्ती आ सकती है। दवा लेने के बाद वाहन चलाने या मशीनरी चलाने से बचें।"
+    },
+    "side_effects": {
+      "en": "Mild sleepiness, dry mouth, tiredness.",
+      "hi": "हल्की नींद, मुंह सूखना, थकान महसूस होना।"
+    }
+  },
+  "montelukast": {
+    "generic": "Montelukast Sodium",
+    "brand_names": ["Montair", "Singulair", "Telekast", "Montair-LC (with Levocetirizine)"],
+    "category": {
+      "en": "Leukotriene Receptor Antagonist",
+      "hi": "अस्थमा और श्वसन एलर्जी रोधी दवा"
+    },
+    "default_dosage": "10mg",
+    "timing": {
+      "en": "Take once daily in the evening",
+      "hi": "दिन में एक बार शाम को लें"
+    },
+    "schedule": "0-0-1 (Night)",
+    "schedule_hi": "0-0-1 (रात को)",
+    "uses": {
+      "en": "Prevents asthma attacks, exercise-induced bronchospasm, and chronic seasonal allergic rhinitis.",
+      "hi": "अस्थमा के दौरे की रोकथाम, सांस फूलने और मौसमी एलर्जी से बचाव करता है।"
+    },
+    "warnings": {
+      "en": "Not for acute sudden asthma attacks. Report changes in mood or sleep patterns.",
+      "hi": "अचानक उठे अस्थमा के तीव्र दौरे के लिए नहीं। मूड या नींद में असामान्य बदलाव पर डॉक्टर को सूचित करें।"
+    },
+    "side_effects": {
+      "en": "Vivid dreams, mild headache, cough.",
+      "hi": "गहरे सपने आना, हल्का सिरदर्द, खांसी।"
+    }
+  },
+  "levothyroxine": {
+    "generic": "Levothyroxine Sodium",
+    "brand_names": ["Thyronorm", "Eltroxin", "Synthroid", "Thyrox"],
+    "category": {
+      "en": "Thyroid Hormone Supplement",
+      "hi": "थायरॉइड हार्मोन सप्लीमेंट"
+    },
+    "default_dosage": "25mcg / 50mcg / 100mcg",
+    "timing": {
+      "en": "FIRST THING IN THE MORNING on empty stomach with plain water. Wait 45 mins before tea/breakfast.",
+      "hi": "सुबह उठते ही सबसे पहले खाली पेट सादे पानी से लें। चाय या नाश्ते से 45 मिनट पूर्व।"
+    },
+    "schedule": "1-0-0 (Early Morning Empty Stomach)",
+    "schedule_hi": "1-0-0 (प्रातः काल खाली पेट)",
+    "uses": {
+      "en": "Replenishes low thyroid hormone in hypothyroidism; restores metabolism and energy.",
+      "hi": "हाइपोथायरायडिज्म में कम थायरॉइड हार्मोन की पूर्ति करता है; ऊर्जा व चयापचय सामान्य रखता है।"
+    },
+    "warnings": {
+      "en": "Do not take Calcium or Iron tablets within 4 hours of Levothyroxine as they block absorption.",
+      "hi": "कैल्शियम या आयरन की गोलियां इस दवा के 4 घंटे के भीतर न लें, यह दवा के असर को रोकती हैं।"
+    },
+    "side_effects": {
+      "en": "Heart palpitations if dose is too high, mild weight fluctuations.",
+      "hi": "खुराक ज्यादा होने पर दिल की धड़कन तेज होना, वजन में उतार-चढ़ाव।"
+    }
+  },
+  "omeprazole": {
+    "generic": "Omeprazole",
+    "brand_names": ["Omez", "Prilosec", "Ocid", "Omee"],
+    "category": {
+      "en": "Proton Pump Inhibitor (Antacid)",
+      "hi": "पेट की गैस और अल्सर रोधी दवा"
+    },
+    "default_dosage": "20mg",
+    "timing": {
+      "en": "Take 30 minutes before breakfast on empty stomach",
+      "hi": "नाश्ते से 30 मिनट पहले खाली पेट लें"
+    },
+    "schedule": "1-0-0 (Empty Stomach)",
+    "schedule_hi": "1-0-0 (खाली पेट)",
+    "uses": {
+      "en": "Relieves severe heartburn, duodenal ulcers, and stomach acid reflux.",
+      "hi": "सीने की जलन, आंतों के अल्सर और एसिडिटी से आराम दिलाता है।"
+    },
+    "warnings": {
+      "en": "Do not chew the capsule. Take regular magnesium and B12 if on long-term therapy.",
+      "hi": "कैप्सूल को चबाएं नहीं। लंबे इलाज में मैग्नीशियम की जांच कराएं।"
+    },
+    "side_effects": {
+      "en": "Flatulence, headache, constipation or diarrhea.",
+      "hi": "पेट में गैस, सिरदर्द, कब्ज या दस्त।"
+    }
+  }
+}

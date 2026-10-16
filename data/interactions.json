@@ -1,0 +1,82 @@
+[
+  {
+    "drugs": ["aspirin", "warfarin"],
+    "severity": "contraindicated",
+    "title_en": "Extreme Hemorrhage Risk",
+    "title_hi": "अत्यधिक रक्तस्राव का घातक जोखिम",
+    "description_en": "Combining Warfarin (anticoagulant) with Aspirin (antiplatelet) drastically impairs blood clotting. This significantly heightens the danger of life-threatening gastrointestinal bleeding, cerebral hemorrhage, and uncontrolled bruising.",
+    "description_hi": "वारफेरिन और एस्पिरिन दोनों खून पतला करते हैं। इन्हें एक साथ लेने से आंतरिक रक्तस्राव (इंटरनल ब्लीडिंग) और मस्तिष्क में खून बहने का जानलेवा खतरा बढ़ जाता है।",
+    "action_en": "Requires immediate medical consultation. Only prescribe together under specialized cardiac monitoring with strict INR checks.",
+    "action_hi": "तुरंत डॉक्टर से संपर्क करें। बिना विशेष निगरानी के दोनों को एक साथ कभी न लें।"
+  },
+  {
+    "drugs": ["ibuprofen", "warfarin"],
+    "severity": "contraindicated",
+    "title_en": "Severe Gastric Hemorrhage & INR Destabilization",
+    "title_hi": "गंभीर पेट का रक्तस्राव एवं असुरक्षित INR",
+    "description_en": "NSAIDs like Ibuprofen cause direct gastric erosion and inhibit platelet aggregation while Warfarin prevents clotting, causing severe gastrointestinal ulcer bleeding.",
+    "description_hi": "आइबुप्रोफेन पेट की परत को नुकसान पहुंचाती है और वारफेरिन खून पतला करती है, जिससे पेट में अल्सर और खून बहने का गंभीर खतरा होता है।",
+    "action_en": "Avoid Ibuprofen entirely. Use Paracetamol for pain relief under physician advice.",
+    "action_hi": "आइबुप्रोफेन बिल्कुल न लें। दर्द के लिए डॉक्टर की सलाह से पैरासिटामोल ले सकते हैं।"
+  },
+  {
+    "drugs": ["aspirin", "metformin"],
+    "severity": "major",
+    "title_en": "Enhanced Hypoglycemia & Renal Vulnerability",
+    "title_hi": "अचानक शुगर कम होना और किडनी पर तनाव",
+    "description_en": "High or regular doses of salicylates can intensify the blood sugar-lowering effect of Metformin and cause mild dehydration, stressing kidney clearance.",
+    "description_hi": "एस्पिरिन मेटफॉर्मिन के शुगर घटाने के प्रभाव को बढ़ा सकती है, जिससे शुगर अचानक बहुत कम (हाइपोग्लाइसीमिया) होने का खतरा रहता है।",
+    "action_en": "Monitor fasting and post-meal glucose frequently. Maintain ample hydration.",
+    "action_hi": "समय-समय पर शुगर की जांच करें और पर्याप्त मात्रा में पानी पिएं।"
+  },
+  {
+    "drugs": ["aspirin", "ibuprofen"],
+    "severity": "moderate",
+    "title_en": "Loss of Cardioprotective Benefit & Stomach Irritation",
+    "title_hi": "एस्पिरिन के हृदय सुरक्षा असर में कमी व एसिडिटी",
+    "description_en": "Ibuprofen binds competitively to platelet COX-1 receptors, preventing low-dose Aspirin from producing its irreversible anti-thrombotic protective action against heart attack.",
+    "description_hi": "आइबुप्रोफेन लेने से एस्पिरिन का दिल को सुरक्षित रखने वाला असर कम हो जाता है, और पेट में गैस व अल्सर का खतरा बढ़ता है।",
+    "action_en": "Take Aspirin at least 30 minutes before or 8 hours after taking Ibuprofen, or switch to an alternate analgesic.",
+    "action_hi": "एस्पिरिन को आइबुप्रोफेन से 30 मिनट पहले या 8 घंटे बाद लें, अथवा दूसरा दर्दनिवारक चुनें।"
+  },
+  {
+    "drugs": ["aspirin", "atorvastatin"],
+    "severity": "moderate",
+    "title_en": "Slightly Elevated Bleeding Tendency",
+    "title_hi": "रक्तस्राव की मामूली संभावना",
+    "description_en": "This is a standard guideline-directed cardiac combination, but minor bruising or prolonged bleeding after needle pricks may occasionally occur.",
+    "description_hi": "यह संयोजन दिल के मरीजों में आमतौर पर सुरक्षित माना जाता है, पर चोट लगने पर खून थोड़ा अधिक देर बह सकता है।",
+    "action_en": "Generally safe when prescribed by a cardiologist. Report any tarry stools or persistent nosebleeds.",
+    "action_hi": "डॉक्टर द्वारा निर्धारित मात्रा में लें। नाक से खून आने या काले मल की समस्या पर डॉक्टर को बताएं।"
+  },
+  {
+    "drugs": ["ibuprofen", "losartan"],
+    "severity": "major",
+    "title_en": "Blunted Blood Pressure Control & Acute Kidney Risk",
+    "title_hi": "बीपी की दवा का असर कम होना एवं गुर्दे पर असर",
+    "description_en": "NSAIDs reduce renal prostaglandin synthesis, which can counteract the blood pressure lowering effect of Losartan and cause fluid retention or sudden kidney impairment.",
+    "description_hi": "आइबुप्रोफेन बीपी की दवा (लोसार्टन) के असर को कम कर देती है और गुर्दे की कार्यक्षमता को प्रभावित कर सकती है।",
+    "action_en": "Limit NSAID duration to 48 hours. Prefer Paracetamol for mild pain in hypertensive patients.",
+    "action_hi": "दर्द के लिए पैरासिटामोल को प्राथमिकता दें और दर्द निवारक गोलियां कम से कम लें।"
+  },
+  {
+    "drugs": ["ibuprofen", "telmisartan"],
+    "severity": "major",
+    "title_en": "Attenuated Antihypertensive Response & Renal Strain",
+    "title_hi": "बीपी नियंत्रण में बाधा और गुर्दे पर दबाव",
+    "description_en": "Concurrent administration may lead to deterioration of renal function, particularly in dehydrated or elderly individuals, alongside reduced blood pressure control.",
+    "description_hi": "दोनों दवाएं साथ लेने से शरीर में पानी भर सकता है और ब्लड प्रेशर बढ़ सकता है।",
+    "action_en": "Monitor blood pressure and serum creatinine if pain medication is taken repeatedly.",
+    "action_hi": "ब्लड प्रेशर की नियमित निगरानी रखें और अधिक दिनों तक दर्दनिवारक न लें।"
+  },
+  {
+    "drugs": ["levothyroxine", "pantoprazole"],
+    "severity": "moderate",
+    "title_en": "Decreased Thyroid Hormone Absorption",
+    "title_hi": "थायरॉइड दवा के अवशोषण में कमी",
+    "description_en": "Proton pump inhibitors reduce stomach acidity, which can impair the complete dissolution and absorption of Levothyroxine in the gut.",
+    "description_hi": "पैंटोप्राजोल पेट में एसिड कम करती है, जिससे थायरॉइड की गोली का पूरा असर शरीर पर नहीं हो पाता।",
+    "action_en": "Take Levothyroxine at least 4 hours apart from acid-suppressing agents, or monitor TSH levels.",
+    "action_hi": "थायरॉइड की गोली सुबह खाली पेट लें और दोनों दवाओं में कम से कम 4 घंटे का अंतर रखें।"
+  }
+]
