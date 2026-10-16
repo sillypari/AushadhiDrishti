@@ -144,6 +144,46 @@ DEMOGRAPHIC_PRECAUTIONS: Dict[str, Dict[str, Any]] = {
     }
 }
 
+# Administration timing and meal-relation clinical guidelines
+MEAL_TIMING_RULES: Dict[str, Dict[str, Any]] = {
+    "pantoprazole": {
+        "preferred": "empty_stomach",
+        "rule_en": "Take 30 to 60 minutes before breakfast on an empty stomach.",
+        "rule_hi": "सुबह नाश्ते से 30 से 60 मिनट पहले खाली पेट लें।",
+        "mismatch_warning": "Antacids taken after meals show significantly diminished acid-suppression efficacy."
+    },
+    "omeprazole": {
+        "preferred": "empty_stomach",
+        "rule_en": "Administer 30 to 60 minutes prior to first meal.",
+        "rule_hi": "दिन के पहले भोजन से 30 से 60 मिनट पहले लें।",
+        "mismatch_warning": "Absorption is reduced when taken with or after food."
+    },
+    "levothyroxine": {
+        "preferred": "empty_stomach",
+        "rule_en": "Strictly administer upon waking with water, at least 30-60 min before breakfast.",
+        "rule_hi": "सुबह उठते ही पानी के साथ लें, नाश्ते से कम से कम 30-60 मिनट पहले।",
+        "mismatch_warning": "Food and coffee drastically impair gastrointestinal absorption."
+    },
+    "metformin": {
+        "preferred": "with_food",
+        "rule_en": "Always take with or immediately after meals to reduce gastrointestinal distress.",
+        "rule_hi": "पेट की ख़राबी से बचने के लिए हमेशा भोजन के साथ या तुरंत बाद लें।",
+        "mismatch_warning": "Taking metformin on an empty stomach significantly increases nausea and GI cramping."
+    },
+    "ibuprofen": {
+        "preferred": "with_food",
+        "rule_en": "Administer after meals or with a snack to protect stomach lining.",
+        "rule_hi": "पेट की परत की सुरक्षा के लिए भोजन या नाश्ते के बाद लें।",
+        "mismatch_warning": "NSAIDs taken without food significantly elevate gastric ulceration risk."
+    },
+    "aspirin": {
+        "preferred": "with_food",
+        "rule_en": "Take with meals or plenty of fluids to minimize gastric mucosal irritation.",
+        "rule_hi": "पेट में जलन से बचने के लिए भोजन के साथ लें।",
+        "mismatch_warning": "Ingestion on an empty stomach increases mucosal erosion risk."
+    }
+}
+
 
 def parse_dosage_value(dosage_str: str) -> Optional[float]:
     """Extract numeric dosage value in milligrams from strings like '500 mg', '0.5g', '100 mcg'."""
@@ -182,6 +222,35 @@ def parse_dosage_value(dosage_str: str) -> Optional[float]:
             return float(num_match.group(1))
         except ValueError:
             pass
+
+    return None
+
+
+def parse_liquid_volume_ml(dosage_str: str) -> Optional[float]:
+    """Extracts liquid dosage in milliliters from strings like '5 ml', '1 tsp', '1 tbsp'."""
+    if not dosage_str:
+        return None
+    cleaned = dosage_str.strip().lower()
+
+    # Milliliters
+    ml_match = re.search(r"([\d.]+)\s*ml\b", cleaned)
+    if ml_match:
+        try:
+            return float(ml_match.group(1))
+        except ValueError:
+            pass
+
+    # Teaspoon (5 ml)
+    tsp_match = re.search(r"([\d.]+)?\s*(?:tsp|teaspoon)\b", cleaned)
+    if tsp_match:
+        qty = float(tsp_match.group(1)) if tsp_match.group(1) else 1.0
+        return qty * 5.0
+
+    # Tablespoon (15 ml)
+    tbsp_match = re.search(r"([\d.]+)?\s*(?:tbsp|tablespoon)\b", cleaned)
+    if tbsp_match:
+        qty = float(tbsp_match.group(1)) if tbsp_match.group(1) else 1.0
+        return qty * 15.0
 
     return None
 
@@ -291,6 +360,44 @@ def validate_special_population_safety(
         "drug": drug_canonical_name,
         "contraindicated": contraindicated,
         "demographic_warnings": warnings
+    }
+
+
+def validate_administration_timing(
+    drug_canonical_name: str,
+    timing_instruction: str
+) -> Dict[str, Any]:
+    """Checks if the administration timing matches pharmacological food-relation requirements."""
+    key = drug_canonical_name.strip().lower()
+    rule = MEAL_TIMING_RULES.get(key)
+    if not rule:
+        return {
+            "status": "unverified",
+            "message": f"No specific meal timing restrictions cataloged for {drug_canonical_name}."
+        }
+
+    clean_t = timing_instruction.strip().lower()
+    is_after_food = any(w in clean_t for w in ["after", "post", "pc", "with food", "with meals", "after meal", "after breakfast", "after dinner"])
+    is_empty_stomach = any(w in clean_t for w in ["before", "empty", "ac", "ante", "fasting", "empty stomach", "before food", "before breakfast"])
+
+    preferred = rule["preferred"]
+    timing_compliant = True
+    warning = None
+
+    if preferred == "empty_stomach" and is_after_food and not is_empty_stomach:
+        timing_compliant = False
+        warning = rule["mismatch_warning"]
+    elif preferred == "with_food" and is_empty_stomach and not is_after_food:
+        timing_compliant = False
+        warning = rule["mismatch_warning"]
+
+    return {
+        "drug": drug_canonical_name,
+        "timing_compliant": timing_compliant,
+        "preferred_relation": preferred,
+        "recommendation_en": rule["rule_en"],
+        "recommendation_hi": rule["rule_hi"],
+        "warning": warning
     }
 
 
