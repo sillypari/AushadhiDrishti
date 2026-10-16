@@ -78,5 +78,35 @@
     "description_hi": "पैंटोप्राजोल पेट में एसिड कम करती है, जिससे थायरॉइड की गोली का पूरा असर शरीर पर नहीं हो पाता।",
     "action_en": "Take Levothyroxine at least 4 hours apart from acid-suppressing agents, or monitor TSH levels.",
     "action_hi": "थायरॉइड की गोली सुबह खाली पेट लें और दोनों दवाओं में कम से कम 4 घंटे का अंतर रखें।"
+  },
+  {
+    "drugs": ["atorvastatin", "azithromycin"],
+    "severity": "major",
+    "title_en": "Increased Risk of Statin Toxicity & Myopathy",
+    "title_hi": "मांसपेशियों में खिंचाव और स्टेटिन विषाक्तता का खतरा",
+    "description_en": "Azithromycin can inhibit CYP3A4-mediated metabolism of Atorvastatin, resulting in elevated statin concentrations in the bloodstream and increasing the probability of severe muscle breakdown (rhabdomyolysis).",
+    "description_hi": "एजिथ्रोमाइसिन एटोरवास्टेटिन के असर को बहुत बढ़ा सकती है, जिससे मांसपेशियों में गंभीर कमजोरी और दर्द का खतरा हो सकता है।",
+    "action_en": "Temporarily suspend or lower statin dose during the 3-5 day antibiotic course. Report muscle soreness promptly.",
+    "action_hi": "एंटीबायोटिक कोर्स के दौरान डॉक्टर की सलाह से स्टेटिन की खुराक कम करें या कुछ दिन रोकें।"
+  },
+  {
+    "drugs": ["warfarin", "azithromycin"],
+    "severity": "major",
+    "title_en": "Potentiated Anticoagulation & Hemorrhage Risk",
+    "title_hi": "खून अधिक पतला होने और रक्तस्राव का बढ़ा हुआ खतरा",
+    "description_en": "Macrolides alter intestinal flora and interfere with hepatic clearance, causing dangerous spikes in INR levels when combined with Warfarin.",
+    "description_hi": "एजिथ्रोमाइसिन वारफेरिन के प्रभाव को बढ़ा सकती है, जिससे अचानक आंतरिक रक्तस्राव का गंभीर खतरा पैदा हो सकता है।",
+    "action_en": "Check prothrombin time / INR within 3 days of initiating azithromycin therapy. Adjust warfarin dosage as indicated.",
+    "action_hi": "एंटीबायोटिक शुरू करने के 3 दिन के भीतर INR की जांच अवश्य कराएं।"
+  },
+  {
+    "drugs": ["aspirin", "losartan"],
+    "severity": "moderate",
+    "title_en": "Reduced Antihypertensive Efficacy",
+    "title_hi": "ब्लड प्रेशर नियंत्रण प्रभाव में कमी",
+    "description_en": "NSAIDs and high-dose salicylates inhibit renal prostaglandins, dampening the vasodilatory and blood-pressure-lowering effects of ARBs like Losartan.",
+    "description_hi": "एस्पिरिन लोसार्टन के बीपी कम करने के असर को कुछ हद तक घटा सकती है।",
+    "action_en": "Use lowest effective analgesic dose and monitor blood pressure weekly.",
+    "action_hi": "दर्द निवारक दवा कम मात्रा में लें और नियमित रूप से ब्लड प्रेशर मापते रहें।"
   }
 ]

@@ -403,5 +403,140 @@
       "en": "Flatulence, headache, constipation or diarrhea.",
       "hi": "पेट में गैस, सिरदर्द, कब्ज या दस्त।"
     }
+  },
+  "pantoprazole": {
+    "generic": "Pantoprazole Sodium",
+    "brand_names": ["Pan 40", "Pantocid", "Pantodac", "Protonix"],
+    "category": {
+      "en": "Proton Pump Inhibitor (Gastric Acid Reducer)",
+      "hi": "प्रोटॉन पंप इनहिबिटर (गैस एवं एसिडिटी रोधी)"
+    },
+    "default_dosage": "40mg",
+    "timing": {
+      "en": "Take 30 minutes before breakfast on empty stomach",
+      "hi": "सुबह नाश्ते से 30 मिनट पहले खाली पेट लें"
+    },
+    "schedule": "1-0-0 (Morning Empty Stomach)",
+    "schedule_hi": "1-0-0 (सुबह खाली पेट)",
+    "uses": {
+      "en": "Heals erosive esophagitis, gastroesophageal reflux disease (GERD), and Zollinger-Ellison syndrome.",
+      "hi": "सीने की जलन, एसिड रिफ्लक्स और पेट के छालों के इलाज में उपयोगी।"
+    },
+    "warnings": {
+      "en": "Swallow whole without crushing. Prolonged usage may decrease calcium/magnesium absorption.",
+      "hi": "गोली को चबाएं नहीं। लंबे समय तक लेने पर कैल्शियम स्तर की निगरानी रखें।"
+    },
+    "side_effects": {
+      "en": "Mild headache, dry mouth, benign abdominal cramps.",
+      "hi": "हल्का सिरदर्द, मुंह सूखना, पेट में मरोड़।"
+    }
+  },
+  "cetirizine": {
+    "generic": "Cetirizine Hydrochloride",
+    "brand_names": ["Cetzine", "Alerid", "Zyrtec", "Okacet", "Cetcip"],
+    "category": {
+      "en": "Antihistamine (Allergy & Rhinitis)",
+      "hi": "एंटीहिस्टामाइन (एलर्जी एवं सर्दी-जुकाम)"
+    },
+    "default_dosage": "10mg",
+    "timing": {
+      "en": "Take once daily, preferably at bedtime",
+      "hi": "दिन में एक बार, रात को सोते समय लें"
+    },
+    "schedule": "0-0-1 (Night Before Sleep)",
+    "schedule_hi": "0-0-1 (रात को सोने से पहले)",
+    "uses": {
+      "en": "Relieves allergic rhinitis, watery eyes, sneezing, hives, and pruritus.",
+      "hi": "एलर्जी, छींक, बहती नाक, आंखों में खुजली और पित्ती से राहत।"
+    },
+    "warnings": {
+      "en": "May cause mild drowsiness. Avoid driving or operating machinery after consumption.",
+      "hi": "हल्की नींद आ सकती है। दवा लेने के बाद गाड़ी चलाने से बचें।"
+    },
+    "side_effects": {
+      "en": "Drowsiness, fatigue, dry mouth.",
+      "hi": "उनींदापन, थकान, मुंह सूखना।"
+    }
+  },
+  "azithromycin": {
+    "generic": "Azithromycin Dihydrate",
+    "brand_names": ["Azithral", "Azee", "Zithromax", "Azimax", "Zady"],
+    "category": {
+      "en": "Macrolide Antibiotic (Bacterial Infections)",
+      "hi": "मैक्रोलाइड एंटीबायोटिक (बैक्टीरियल संक्रमण)"
+    },
+    "default_dosage": "500mg",
+    "timing": {
+      "en": "Take once daily, at least 1 hour before or 2 hours after meals",
+      "hi": "दिन में एक बार, खाने से 1 घंटा पहले या 2 घंटे बाद लें"
+    },
+    "schedule": "1-0-0 (Once Daily for 3-5 days)",
+    "schedule_hi": "1-0-0 (दिन में एक बार, 3-5 दिनों तक)",
+    "uses": {
+      "en": "Treats respiratory tract infections, tonsillitis, sinusitis, and skin infections.",
+      "hi": "गले में खराश, फेफड़ों के संक्रमण, साइनसाइटिस और त्वचा संक्रमण का उपचार।"
+    },
+    "warnings": {
+      "en": "Complete the full prescribed course even if symptoms resolve early. Do not take with antacids.",
+      "hi": "कोर्स पूरा करें भले ही आराम महसूस हो। एंटासिड के साथ न लें।"
+    },
+    "side_effects": {
+      "en": "Mild diarrhea, nausea, stomach discomfort.",
+      "hi": "हल्के दस्त, मतली, पेट में दर्द।"
+    }
+  },
+  "atorvastatin": {
+    "generic": "Atorvastatin Calcium",
+    "brand_names": ["Atorva", "Lipitor", "Storvas", "Atocor", "Tonact"],
+    "category": {
+      "en": "HMG-CoA Reductase Inhibitor (Cholesterol Lowering)",
+      "hi": "कोलेस्ट्रॉल कम करने वाली दवा (स्टेटिन)"
+    },
+    "default_dosage": "10mg",
+    "timing": {
+      "en": "Take once daily in the evening, with or without food",
+      "hi": "शाम के समय एक बार, भोजन के साथ या बिना लें"
+    },
+    "schedule": "0-0-1 (Night Post-Dinner)",
+    "schedule_hi": "0-0-1 (रात के भोजन के बाद)",
+    "uses": {
+      "en": "Reduces LDL cholesterol, triglycerides, and minimizes cardiovascular attack risk.",
+      "hi": "खराब कोलेस्ट्रॉल कम करता है और हृदय रोग व दिल के दौरे के खतरे को घटाता है।"
+    },
+    "warnings": {
+      "en": "Avoid large quantities of grapefruit juice. Report unexplained muscle aches immediately.",
+      "hi": "अंगूर के रस से बचें। यदि मांसपेशियों में दर्द हो तो तुरंत डॉक्टर को बताएं।"
+    },
+    "side_effects": {
+      "en": "Muscle soreness, slight joint stiffness, elevated liver transaminases.",
+      "hi": "मांसपेशियों में खिंचाव, जोड़ों में दर्द, हल्का सिरदर्द।"
+    }
+  },
+  "losartan": {
+    "generic": "Losartan Potassium",
+    "brand_names": ["Losar", "Cozaar", "Repace", "Covance", "Alsartan"],
+    "category": {
+      "en": "Angiotensin II Receptor Blocker (Antihypertensive)",
+      "hi": "उच्च रक्तचाप रोधी दवा (एंटी-हाइपरटेंसिव)"
+    },
+    "default_dosage": "50mg",
+    "timing": {
+      "en": "Take consistently at the same time every morning with water",
+      "hi": "प्रतिदिन सुबह एक ही समय पानी के साथ लें"
+    },
+    "schedule": "1-0-0 (Morning with Water)",
+    "schedule_hi": "1-0-0 (सुबह पानी के साथ)",
+    "uses": {
+      "en": "Manages essential hypertension and protects renal function in diabetic patients.",
+      "hi": "हाई ब्लड प्रेशर को नियंत्रित करता है और किडनी की सुरक्षा करता है।"
+    },
+    "warnings": {
+      "en": "Do not discontinue abruptly. Monitor blood pressure and serum potassium regularly.",
+      "hi": "दवा अचानक बंद न करें। नियमित रूप से ब्लड प्रेशर और पोटेशियम की जांच कराएं।"
+    },
+    "side_effects": {
+      "en": "Dizziness upon standing, nasal congestion, mild fatigue.",
+      "hi": "अचानक खड़े होने पर चक्कर आना, नाक बंद होना, थकान।"
+    }
   }
 }
