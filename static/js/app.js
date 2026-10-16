@@ -27,9 +27,15 @@ const state = {
   run: null,
   view: 'input',
   config: null,
-  editProvider: null
+  editProvider: null,
+  perf: {},
+  analysisMeta: null,
+  history: []
 };
 let runSeq = 0;
+
+const HISTORY_KEY = 'ad_history_v1';
+const HISTORY_MAX = 20;
 
 /* --------------------------------------------------------------------------
    Strings
@@ -42,6 +48,7 @@ const I18N = {
     themeLight: 'Light mode',
     btnSettings: 'API settings',
     heroTitle: 'Read any prescription. Check it for unsafe combinations.',
+    heroEyebrow: 'Prescription scanner and medication safety',
     heroDesc: 'Upload a photo of a prescription to extract each medicine, screen for drug interactions, and get a daily timetable in English and Hindi.',
     dropTitle: 'Upload a prescription image',
     dropSub: 'Drag and drop a file here, or choose one. JPG, PNG or WebP.',
@@ -81,15 +88,13 @@ const I18N = {
     kvContrast: 'Contrast',
     kvSharpness: 'Sharpness',
     kvOutput: 'Output',
-    vision_active_live: (label, model, s) => `Waiting for ${label} (${model}) - ${s} s`,
-    vision_failover: (used, failed) => `Used ${used} after: ${failed}.`,
-    kvProvider: 'Provider',
+    vision_active_live: (s) => `Transcribing handwriting and clinical entities - ${s} s`,
     vision_active_offline: 'Preparing the offline engine',
-    vision_slow: 'This is taking longer than usual. The model is still working.',
+    vision_slow: 'This is taking longer than usual. The analysis is still working.',
     vision_done_live: (n, s) => `${n} medicine${n === 1 ? '' : 's'} extracted in ${s} s`,
-    vision_done_offline: (n, reason) => `Offline engine used (${reason}). ${n} medicine${n === 1 ? '' : 's'} returned from built-in demo data; the image itself was not read by a model.`,
-    kvModel: 'Model',
-    kvEndpoint: 'Endpoint',
+    vision_done_offline: (n, reason) => `Offline engine used (${reason}). ${n} medicine${n === 1 ? '' : 's'} returned from demo data.`,
+    reasonNoKey: 'no API key configured',
+    reasonUnavailable: 'vision service unavailable',
     kvPatient: 'Patient',
     screening_active: 'Matching names to the drug database and checking every pair',
     screening_done: (matched, total, pairs, rules) => `${matched} of ${total} medicines matched. ${pairs} pair${pairs === 1 ? '' : 's'} checked against ${rules} rules`,
@@ -103,7 +108,6 @@ const I18N = {
     meta_type: 'Type',
     meta_original: 'Original (px)',
     meta_enhanced: 'Enhanced (px)',
-    meta_model: 'Model',
 
     viewerTitle: 'Enhanced scan',
     patientDetails: 'Prescription details',
@@ -134,21 +138,53 @@ const I18N = {
     lblWarnings: 'Warning:',
     notInDb: 'Not in database',
     btnDownloadPDF: 'Print or save as PDF',
-    btnScanNew: 'Scan another prescription',
-    sourceLive: 'Live model',
-    sourceOffline: 'Offline engine',
+    btnScanNew: 'Scan another',
+    sourceLive: 'Clinical analysis',
+    sourceOffline: 'Demo analysis',
     disclaimer: 'Medical disclaimer: AushadhiDrishti is an AI assistant for educational and informational use. Consult a licensed physician or pharmacist before starting, changing or stopping any medication.',
 
+    btnHistory: 'History',
+    historyTitle: 'Scan history',
+    historyCount: (n) => `${n} saved scan${n === 1 ? '' : 's'}`,
+    btnClearHistory: 'Clear history',
+    historyEmpty: 'No prescription scans saved yet.',
+    historyEmptySub: 'Scans you analyze will automatically appear here.',
+    confirmClearHistory: 'Delete all saved scans? This cannot be undone.',
+    btnOpenReport: 'View report',
+    btnDelete: 'Delete',
+
     settingsTitle: 'Model configuration',
-    providerLabel: 'Provider',
+    providerLabel: 'Vision provider',
+    providerInUse: 'In use',
+    providerKeySet: 'Key set',
+    providerNoKey: 'No key',
+    usingProvider: (label) => `Now using ${label}.`,
+    perfScan: (s) => `Last scan: ${s} s`,
+    perfTest: (s) => `Responded in ${s} s`,
+    stepUpload: 'Upload',
+    stepAnalyse: 'Analyse',
+    stepReport: 'Report',
+    how1Title: 'Add a prescription',
+    how1Text: 'Upload a photo or pick a sample. Images are processed in memory and are not stored.',
+    how2Title: 'Watch it work',
+    how2Text: 'Follow each step live: image enhancement, reading, and interaction screening.',
+    how3Title: 'Review the report',
+    how3Text: 'Get a safety verdict, a daily timetable and plain-language guidance in English and Hindi.',
+    reportTitle: 'Prescription report',
+    statMeds: 'Medicines',
+    statMedsSub: (m, n) => `${m} of ${n} matched in database`,
+    statIx: 'Interactions',
+    statIxSub: (n) => `${n} pair${n === 1 ? '' : 's'} checked`,
+    statDoses: 'Doses per day',
+    statDosesSub: 'Morning, afternoon, night',
+    statTime: 'Read in',
+    statTimeSub: 'End-to-end analysis',
     lblFailover: 'If this provider fails, try the other one automatically',
     btnTest: 'Test connection',
     testing: 'Testing...',
     testOk: (ms) => `Connected in ${ms} ms.`,
     testFail: (m) => `Test failed: ${m}.`,
     needKey: (label) => `Add an API key for ${label} to use it.`,
-    modelLine: (label, model) => `Reading with ${label} (${model})`,
-    modelOffline: 'Offline demo engine. No API key is configured.',
     lblApiKey: 'API key',
     lblApiBase: 'API base URL',
     lblModel: 'Model identifier',
@@ -166,6 +202,7 @@ const I18N = {
     themeLight: 'लाइट मोड',
     btnSettings: 'API सेटिंग्स',
     heroTitle: 'किसी भी पर्चे को पढ़ें और असुरक्षित दवा संयोजन जांचें।',
+    heroEyebrow: 'पर्चा स्कैनर और दवा सुरक्षा',
     heroDesc: 'पर्चे की फोटो अपलोड करें। हर दवा पहचानी जाएगी, दवाओं के आपसी टकराव की जांच होगी और हिन्दी व अंग्रेज़ी में दैनिक समय-सारणी मिलेगी।',
     dropTitle: 'पर्चे की तस्वीर अपलोड करें',
     dropSub: 'फ़ाइल यहां खींचकर छोड़ें या चुनें। JPG, PNG या WebP।',
@@ -205,15 +242,13 @@ const I18N = {
     kvContrast: 'कंट्रास्ट',
     kvSharpness: 'स्पष्टता',
     kvOutput: 'आउटपुट',
-    vision_active_live: (label, model, s) => `${label} (${model}) के उत्तर की प्रतीक्षा - ${s} सेकंड`,
-    vision_failover: (used, failed) => `${failed} के बाद ${used} उपयोग हुआ।`,
-    kvProvider: 'प्रदाता',
+    vision_active_live: (s) => `हस्तलेखन और दवाओं की पहचान जारी - ${s} सेकंड`,
     vision_active_offline: 'ऑफ़लाइन इंजन तैयार किया जा रहा है',
-    vision_slow: 'सामान्य से अधिक समय लग रहा है। मॉडल अभी काम कर रहा है।',
+    vision_slow: 'सामान्य से अधिक समय लग रहा है। विश्लेषण जारी है।',
     vision_done_live: (n, s) => `${s} सेकंड में ${n} दवाएं निकाली गईं`,
-    vision_done_offline: (n, reason) => `ऑफ़लाइन इंजन उपयोग हुआ (${reason})। अंतर्निहित डेमो डेटा से ${n} दवाएं मिलीं; तस्वीर को किसी मॉडल ने नहीं पढ़ा।`,
-    kvModel: 'मॉडल',
-    kvEndpoint: 'एंडपॉइंट',
+    vision_done_offline: (n, reason) => `ऑफ़लाइन इंजन उपयोग हुआ (${reason})। डेमो डेटा से ${n} दवाएं मिलीं।`,
+    reasonNoKey: 'कोई API कुंजी सेट नहीं है',
+    reasonUnavailable: 'विज़न सेवा उपलब्ध नहीं थी',
     kvPatient: 'मरीज़',
     screening_active: 'दवाओं के नाम डेटाबेस से मिलाए जा रहे हैं और हर जोड़ी जांची जा रही है',
     screening_done: (matched, total, pairs, rules) => `${total} में से ${matched} दवाएं मिलीं। ${rules} नियमों के विरुद्ध ${pairs} जोड़ियां जांची गईं`,
@@ -227,7 +262,6 @@ const I18N = {
     meta_type: 'प्रकार',
     meta_original: 'मूल (px)',
     meta_enhanced: 'सुधारी गई (px)',
-    meta_model: 'मॉडल',
 
     viewerTitle: 'सुधारा गया स्कैन',
     patientDetails: 'पर्चे का विवरण',
@@ -258,21 +292,53 @@ const I18N = {
     lblWarnings: 'चेतावनी:',
     notInDb: 'डेटाबेस में नहीं',
     btnDownloadPDF: 'प्रिंट करें या PDF सहेजें',
-    btnScanNew: 'दूसरा पर्चा स्कैन करें',
-    sourceLive: 'लाइव मॉडल',
-    sourceOffline: 'ऑफ़लाइन इंजन',
+    btnScanNew: 'दूसरा स्कैन करें',
+    sourceLive: 'चिकित्सीय विश्लेषण',
+    sourceOffline: 'डेमो विश्लेषण',
     disclaimer: 'चिकित्सा अस्वीकरण: औषधि दृष्टि एक एआई सहायक है जो केवल शैक्षिक और सूचनात्मक उपयोग के लिए है। कोई भी दवा शुरू करने, बदलने या बंद करने से पहले डॉक्टर या फार्मासिस्ट से परामर्श करें।',
 
+    btnHistory: 'इतिहास',
+    historyTitle: 'स्कैन इतिहास',
+    historyCount: (n) => `${n} सहेजे गए पर्चे`,
+    btnClearHistory: 'सब हटाएं',
+    historyEmpty: 'अभी कोई पर्चा सहेजा नहीं गया है।',
+    historyEmptySub: 'विश्लेषण किए गए पर्चे अपने आप यहां दिखाई देंगे।',
+    confirmClearHistory: 'सहेजे गए सभी पर्चे हटाएं? यह वापस नहीं होगा।',
+    btnOpenReport: 'रिपोर्ट देखें',
+    btnDelete: 'हटाएं',
+
     settingsTitle: 'मॉडल सेटिंग्स',
-    providerLabel: 'प्रदाता',
+    providerLabel: 'विज़न प्रदाता',
+    providerInUse: 'उपयोग में',
+    providerKeySet: 'कुंजी सेट',
+    providerNoKey: 'कुंजी नहीं',
+    usingProvider: (label) => `अब ${label} उपयोग में है।`,
+    perfScan: (s) => `पिछला स्कैन: ${s} सेकंड`,
+    perfTest: (s) => `${s} सेकंड में उत्तर मिला`,
+    stepUpload: 'अपलोड',
+    stepAnalyse: 'विश्लेषण',
+    stepReport: 'रिपोर्ट',
+    how1Title: 'पर्चा जोड़ें',
+    how1Text: 'फोटो अपलोड करें या नमूना चुनें। तस्वीरें केवल मेमोरी में संसाधित होती हैं, सहेजी नहीं जातीं।',
+    how2Title: 'प्रगति देखें',
+    how2Text: 'हर चरण लाइव देखें: छवि सुधार, पर्चा पढ़ना और दवा टकराव जांच।',
+    how3Title: 'रिपोर्ट देखें',
+    how3Text: 'सुरक्षा निष्कर्ष, दैनिक समय-सारणी और सरल मार्गदर्शन हिन्दी व अंग्रेज़ी में पाएं।',
+    reportTitle: 'पर्चे की रिपोर्ट',
+    statMeds: 'दवाएं',
+    statMedsSub: (m, n) => `${n} में से ${m} डेटाबेस में मिलीं`,
+    statIx: 'टकराव',
+    statIxSub: (n) => `${n} जोड़ियां जांची गईं`,
+    statDoses: 'प्रतिदिन खुराक',
+    statDosesSub: 'सुबह, दोपहर, रात',
+    statTime: 'पढ़ने में समय',
+    statTimeSub: 'पूर्ण विश्लेषण',
     lblFailover: 'यह प्रदाता विफल हो तो दूसरा अपने आप आज़माएं',
     btnTest: 'कनेक्शन जांचें',
     testing: 'जांच हो रही है...',
     testOk: (ms) => `${ms} मि.से. में कनेक्ट हुआ।`,
     testFail: (m) => `जांच विफल: ${m}।`,
     needKey: (label) => `${label} उपयोग करने के लिए API कुंजी जोड़ें।`,
-    modelLine: (label, model) => `${label} (${model}) से पढ़ा जाएगा`,
-    modelOffline: 'ऑफ़लाइन डेमो इंजन। कोई API कुंजी सेट नहीं है।',
     lblApiKey: 'API कुंजी',
     lblApiBase: 'API बेस URL',
     lblModel: 'मॉडल का नाम',
@@ -308,8 +374,11 @@ document.addEventListener('DOMContentLoaded', () => {
     'safety-banner', 'safety-icon', 'safety-title', 'safety-desc', 'summary-text', 'btn-audio-summary',
     'audio-icon', 'audio-label', 'interactions-list', 'schedule-morning', 'schedule-afternoon',
     'schedule-night', 'count-morning', 'count-afternoon', 'count-night', 'medications-cards',
-    'btn-scan-new', 'btn-print-card',
-    'provider-switch', 'provider-tabs', 'btn-test', 'input-failover', 'model-line'
+    'btn-scan-new', 'btn-scan-another-bottom', 'btn-print-card', 'btn-print-bottom', 'brand-home',
+    'btn-history-open', 'btn-history-close', 'btn-clear-history', 'modal-history', 'history-list',
+    'history-count', 'history-badge',
+    'provider-cards', 'btn-test', 'input-failover', 'steps', 'report-sub', 'theme-use',
+    'stat-meds', 'stat-meds-sub', 'stat-ix', 'stat-ix-sub', 'stat-doses', 'stat-doses-sub', 'stat-time', 'stat-time-sub'
   ].forEach((id) => { el[id] = $(id); });
 
   applyTheme();
@@ -317,10 +386,23 @@ document.addEventListener('DOMContentLoaded', () => {
   bindEvents();
   loadSamples();
   loadApiConfig();
+  loadHistory();
 });
+
+function updateSteps(name) {
+  const order = ['input', 'progress', 'results'];
+  const idx = order.indexOf(name);
+  el.steps.querySelectorAll('li').forEach((li) => {
+    const i = order.indexOf(li.dataset.step);
+    li.classList.toggle('is-current', i === idx);
+    li.classList.toggle('is-done', i < idx);
+    if (i === idx) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+  });
+}
 
 function showView(name) {
   state.view = name;
+  updateSteps(name);
   ['input', 'progress', 'results'].forEach((v) => { el['view-' + v].hidden = v !== name; });
   window.scrollTo({ top: 0, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
 }
@@ -346,6 +428,7 @@ function setLanguage(lang) {
   updateAudioButton();
   renderProviderUI();
   setBadge(el['scan-badge'].dataset.kind || 'scanning');
+  renderHistory();
 
   if (state.samples.length) renderPresets();
   if (state.run) {
@@ -362,7 +445,14 @@ function applyTheme() {
 }
 
 function updateThemeLabel() {
-  if (el['btn-theme-toggle']) el['btn-theme-toggle'].textContent = tr(state.theme === 'dark' ? 'themeLight' : 'themeDark');
+  const b = el['btn-theme-toggle'];
+  if (!b) return;
+  const label = tr(state.theme === 'dark' ? 'themeLight' : 'themeDark');
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  el['theme-use'].setAttribute('href', state.theme === 'dark' ? '#i-sun' : '#i-moon');
+  el['btn-settings-open'].title = tr('btnSettings');
+  el['btn-settings-open'].setAttribute('aria-label', tr('btnSettings'));
 }
 
 /* --------------------------------------------------------------------------
@@ -401,53 +491,40 @@ function bindEvents() {
   });
 
   el['btn-scan-new'].addEventListener('click', resetToUpload);
+  el['btn-scan-another-bottom'].addEventListener('click', resetToUpload);
   el['btn-print-card'].addEventListener('click', () => window.print());
+  el['btn-print-bottom'].addEventListener('click', () => window.print());
   el['btn-audio-summary'].addEventListener('click', toggleAudio);
   el['btn-cancel'].addEventListener('click', resetToUpload);
   el['btn-error-back'].addEventListener('click', resetToUpload);
+
+  /* The logo and the Upload step act as a home button, so any view can always start over. */
+  el['brand-home'].addEventListener('click', resetToUpload);
+  el['brand-home'].addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resetToUpload(); }
+  });
+  el['steps'].querySelector('li[data-step="input"]').addEventListener('click', () => { if (state.view !== 'input') resetToUpload(); });
 
   el['btn-settings-open'].addEventListener('click', () => openSettings());
   el['btn-test'].addEventListener('click', testConnection);
   el['btn-settings-close'].addEventListener('click', closeSettings);
   el['modal-settings'].addEventListener('click', (e) => { if (e.target === el['modal-settings']) closeSettings(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); closeHistory(); } });
   el['form-settings'].addEventListener('submit', saveSettings);
+
+  el['btn-history-open'].addEventListener('click', openHistory);
+  el['btn-history-close'].addEventListener('click', closeHistory);
+  el['btn-clear-history'].addEventListener('click', clearHistory);
+  el['modal-history'].addEventListener('click', (e) => { if (e.target === el['modal-history']) closeHistory(); });
+  el['history-list'].addEventListener('click', onHistoryListClick);
 }
 
 function closeSettings() { el['modal-settings'].classList.remove('active'); }
 
-/* ---- Provider configuration ---- */
-function providerOrder(cfg) {
-  const others = Object.keys(cfg.providers).filter((p) => p !== cfg.active);
-  return cfg.failover ? [cfg.active, ...others] : [cfg.active];
-}
-
-function updateModelLine() {
-  const cfg = state.config;
-  if (!cfg || !el['model-line']) return;
-  const pid = providerOrder(cfg).find((p) => cfg.providers[p].api_key_set);
-  el['model-line'].textContent = pid ? tr('modelLine', cfg.providers[pid].label, cfg.providers[pid].model) : tr('modelOffline');
-}
-
-function buildProviderButtons(container, selected, onPick) {
-  container.innerHTML = '';
-  Object.entries(state.config.providers).forEach(([id, p]) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'segmented-btn' + (id === selected ? ' active' : '') + (p.api_key_set ? '' : ' no-key');
-    b.textContent = p.label;
-    b.title = p.api_key_set ? p.model : tr('needKey', p.label);
-    b.setAttribute('aria-pressed', String(id === selected));
-    b.addEventListener('click', () => onPick(id));
-    container.appendChild(b);
-  });
-}
-
+/* ---- Provider configuration (provider and model names are only shown here, in settings) ---- */
 function renderProviderUI() {
   if (!state.config) return;
-  buildProviderButtons(el['provider-switch'], state.config.active, switchProvider);
-  buildProviderButtons(el['provider-tabs'], state.editProvider, selectEditProvider);
-  updateModelLine();
+  renderProviderCards();
 }
 
 async function postConfig(body) {
@@ -456,12 +533,6 @@ async function postConfig(body) {
   if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
   state.config = data;
   renderProviderUI();
-}
-
-async function switchProvider(id) {
-  const p = state.config.providers[id];
-  if (!p.api_key_set) { openSettings(id, tr('needKey', p.label)); return; }
-  try { await postConfig({ provider: id, activate: true }); } catch (err) { console.error(err); }
 }
 
 function openSettings(provider, message) {
@@ -474,10 +545,42 @@ function openSettings(provider, message) {
   el['input-api-key'].focus();
 }
 
-function selectEditProvider(id) {
+function renderProviderCards() {
+  const box = el['provider-cards'];
+  box.innerHTML = '';
+  Object.entries(state.config.providers).forEach(([id, p]) => {
+    const inUse = id === state.config.active;
+    const perf = state.perf[id];
+    const badge = inUse
+      ? `<span class="badge badge-accent">${esc(tr('providerInUse'))}</span>`
+      : p.api_key_set ? `<span class="badge">${esc(tr('providerKeySet'))}</span>` : `<span class="badge badge-caution">${esc(tr('providerNoKey'))}</span>`;
+    const perfText = perf ? tr(perf.kind === 'scan' ? 'perfScan' : 'perfTest', perf.secs.toFixed(1)) : '';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'provider-card';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(id === state.editProvider));
+    b.innerHTML = `<span class="provider-card-top"><span class="provider-card-name">${esc(p.label)}</span>${badge}</span>` +
+      `<span class="provider-card-model">${esc(p.model)}</span><span class="provider-card-perf">${esc(perfText)}</span>`;
+    b.addEventListener('click', () => pickProviderCard(id));
+    box.appendChild(b);
+  });
+}
+
+/* Choosing a provider card edits it and, when it already has a key, switches to it immediately. */
+async function pickProviderCard(id) {
   state.editProvider = id;
   fillSettingsForm();
-  setSettingsStatus('', false);
+  const p = state.config.providers[id];
+  if (!p.api_key_set) { renderProviderUI(); setSettingsStatus(tr('needKey', p.label), true); return; }
+  if (state.config.active !== id) {
+    try {
+      await postConfig({ provider: id, activate: true });
+      setSettingsStatus(tr('usingProvider', p.label), false);
+    } catch (err) { setSettingsStatus(err.message, true); }
+  } else {
+    setSettingsStatus('', false);
+  }
   renderProviderUI();
 }
 
@@ -527,6 +630,7 @@ async function testConnection() {
     fillSettingsForm();
     const res = await fetch('/api/config/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: state.editProvider }) });
     const r = await res.json();
+    if (r.ok) { state.perf[state.editProvider] = { kind: 'test', secs: r.latency_ms / 1000 }; renderProviderUI(); }
     setSettingsStatus(r.ok ? tr('testOk', r.latency_ms) : tr('testFail', r.message), !r.ok);
   } catch (err) {
     setSettingsStatus(tr('testFail', err.message), true);
@@ -590,7 +694,7 @@ function handleFile(file) {
 
 function handleSample(sample) {
   if (state.run) return;
-  const run = beginRun({ name: `${sample.id}.jpg`, size: null, type: 'image/jpeg', previewUrl: sample.preview_url });
+  const run = beginRun({ name: sample.title_en || `${sample.id}.jpg`, size: null, type: 'image/jpeg', previewUrl: sample.preview_url });
   startStream(run, `/api/analyze-sample/${encodeURIComponent(sample.id)}/stream`, { method: 'POST' });
 }
 
@@ -715,11 +819,19 @@ async function finish(run) {
   await sleep(REDUCED_MOTION ? 0 : 450);
   if (state.run !== run) return;
   if (run.objectUrl) URL.revokeObjectURL(run.objectUrl);
+  const vision = run.stages.vision.data || {};
+  state.analysisMeta = { name: run.meta.name, readSecs: vision.elapsed };
   state.run = null;
   state.analysis = run.result;
   el['image-preview'].src = run.result.image_data_url || '';
   showView('results');
   renderAnalysis(run.result, { animate: true });
+  saveHistoryEntry({
+    name: run.meta.name,
+    readSecs: vision.elapsed ?? null,
+    image: run.result.image_data_url,
+    analysis: run.result.analysis
+  });
 }
 
 function fail(run, message) {
@@ -813,7 +925,7 @@ function setStage(run, id, status, data) {
       if (data.image_data_url) { el['scan-image'].src = data.image_data_url; el['scan-image'].hidden = false; }
     }
     if (id === 'upload' && data.size_bytes != null) run.meta.size = data.size_bytes;
-    if (id === 'vision' && data.model) run.meta.model = data.label ? `${data.label} / ${data.model}` : data.model;
+    if (id === 'vision' && data.engine === 'live' && data.provider) state.perf[data.provider] = { kind: 'scan', secs: data.elapsed };
     renderMeta(run);
   }
   renderStage(run, id);
@@ -852,6 +964,13 @@ function updateVisionDetail(run) {
 
 const fmtBytes = (b) => (b == null ? '-' : b < 1024 * 1024 ? (b / 1024).toFixed(0) + ' KB' : (b / 1024 / 1024).toFixed(2) + ' MB');
 
+/* The raw fallback text names the configured provider, so it is generalised before display. */
+function offlineReason(d) {
+  const errors = (d.attempts || []).map((a) => String(a.error || '').toLowerCase());
+  if (!errors.length || errors.every((e) => e.includes('no api key'))) return tr('reasonNoKey');
+  return tr('reasonUnavailable');
+}
+
 function stageDetail(run, id, st) {
   const d = st.data || {};
   if (st.status === 'pending') return '';
@@ -866,12 +985,11 @@ function stageDetail(run, id, st) {
         const secs = (performance.now() - st.t0) / 1000;
         if (!d.engine) return '';
         if (d.engine === 'offline') return tr('vision_active_offline');
-        return secs > 25 ? tr('vision_slow') : tr('vision_active_live', d.label, d.model, secs.toFixed(0));
+        return secs > 25 ? tr('vision_slow') : tr('vision_active_live', secs.toFixed(0));
       }
       const n = (d.medications || []).length;
-      if (d.engine === 'offline') return tr('vision_done_offline', n, d.fallback_reason || '-');
-      const failed = (d.attempts || []).map((a) => `${a.label}: ${a.error}`).join('; ');
-      return tr('vision_done_live', n, d.elapsed) + (failed ? ' ' + tr('vision_failover', d.label, failed) : '');
+      if (d.engine === 'offline') return tr('vision_done_offline', n, offlineReason(d));
+      return tr('vision_done_live', n, d.elapsed);
     }
     case 'screening':
       if (st.status === 'active') return tr('screening_active');
@@ -892,9 +1010,6 @@ function stageBody(id, st) {
     return `<div class="kv-row">${kv(tr('kvContrast'), '1.4x')}${kv(tr('kvSharpness'), '1.3x')}${kv(tr('kvOutput'), fmtBytes(d.processed_size_bytes))}</div>`;
   }
   if (id === 'vision') {
-    if (st.status === 'active' && d.engine === 'live') {
-      return `<div class="kv-row">${kv(tr('kvProvider'), d.label)}${kv(tr('kvModel'), d.model)}${kv(tr('kvEndpoint'), d.host)}</div>`;
-    }
     if (st.status === 'done' || st.status === 'warn') {
       const chips = (d.medications || []).map((m, i) => `
         <div class="chip" style="animation-delay:${i * 90}ms"><strong>${esc(m.name)}</strong><span>${esc([m.dosage, m.frequency].filter(Boolean).join('  '))}</span></div>`).join('');
@@ -913,11 +1028,11 @@ function stageBody(id, st) {
 }
 
 /* ---- Document meta list ---- */
-const META_ORDER = ['name', 'size', 'type', 'original', 'enhanced', 'model'];
+const META_ORDER = ['name', 'size', 'type', 'original', 'enhanced'];
 
 function renderMeta(run) {
   const m = run.meta;
-  const values = { name: m.name, size: m.size != null ? fmtBytes(m.size) : null, type: m.type, original: m.original, enhanced: m.enhanced, model: m.model };
+  const values = { name: m.name, size: m.size != null ? fmtBytes(m.size) : null, type: m.type, original: m.original, enhanced: m.enhanced };
   const list = el['scan-meta'];
   // Rows are updated in place and inserted in order, so rows already on screen never re-animate.
   META_ORDER.forEach((k, idx) => {
@@ -954,7 +1069,10 @@ function renderAnalysis(data, { animate }) {
   const eng = a.engine || {};
   const offline = eng.mode ? eng.mode === 'offline' : /offline/i.test(a.source || '');
   el['source-tag'].className = 'badge ' + (offline ? 'badge-caution' : 'badge-accent');
-  el['source-tag'].textContent = offline ? tr('sourceOffline') : (eng.label || tr('sourceLive'));
+  el['source-tag'].textContent = offline ? tr('sourceOffline') : tr('sourceLive');
+
+  el['report-sub'].textContent = [(state.analysisMeta || {}).name, offline ? tr('sourceOffline') : tr('sourceLive')].filter(Boolean).join('  -  ');
+  renderStats(a, offline);
 
   const safety = a.safety || { level: 'safe' };
   el['safety-banner'].className = `safety-banner ${safety.level}`;
@@ -971,6 +1089,27 @@ function renderAnalysis(data, { animate }) {
 
   view.querySelectorAll('.reveal').forEach((n, i) => n.style.setProperty('--i', i + 1));
   view.querySelectorAll('.med-item').forEach((n, i) => n.style.setProperty('--i', i));
+}
+
+function renderStats(a, offline) {
+  const meds = a.medications || [];
+  const ix = a.interactions || [];
+  const sc = a.screening || {};
+  const doses = meds.reduce((n, m) => {
+    const s = slotsFor(m.frequency);
+    return n + (s.morning ? 1 : 0) + (s.afternoon ? 1 : 0) + (s.night ? 1 : 0);
+  }, 0);
+  const secs = (state.analysisMeta || {}).readSecs;
+
+  el['stat-meds'].textContent = meds.length;
+  el['stat-meds-sub'].textContent = tr('statMedsSub', sc.medications_matched ?? 0, sc.medications_total ?? meds.length);
+  el['stat-ix'].textContent = ix.length;
+  el['stat-ix'].className = 'stat-value ' + (ix.some((x) => x.severity === 'contraindicated' || x.severity === 'major') ? 'is-danger' : ix.length ? '' : 'is-ok');
+  el['stat-ix-sub'].textContent = tr('statIxSub', sc.pairs_checked ?? 0);
+  el['stat-doses'].textContent = doses;
+  el['stat-doses-sub'].textContent = tr('statDosesSub');
+  el['stat-time'].textContent = secs != null ? `${secs.toFixed(1)} s` : '-';
+  el['stat-time-sub'].textContent = offline ? tr('sourceOffline') : tr('statTimeSub');
 }
 
 const sentenceCase = (s, hi) => {
@@ -1109,4 +1248,167 @@ function resetToUpload() {
   state.analysis = null;
   el['scan-meta'].innerHTML = '';
   showView('input');
+}
+
+/* --------------------------------------------------------------------------
+   Scan history (kept in localStorage so scans survive a reload)
+   -------------------------------------------------------------------------- */
+function loadHistory() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    state.history = Array.isArray(raw) ? raw.filter((e) => e && e.id && e.analysis) : [];
+  } catch {
+    state.history = [];
+  }
+  renderHistory();
+}
+
+function persistHistory(entries) {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(entries)); return true; }
+  catch { return false; }
+}
+
+/* Builds a small JPEG thumbnail; full-size scan images would blow the storage quota. */
+function makeThumb(dataUrl, maxW) {
+  return new Promise((resolve) => {
+    if (!dataUrl) { resolve(null); return; }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxW / img.naturalWidth);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.72));
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+async function saveHistoryEntry({ name, readSecs, image, analysis }) {
+  const thumb = await makeThumb(image, 480);
+  const entries = state.history.slice();
+  entries.unshift({
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    savedAt: Date.now(),
+    name,
+    readSecs,
+    thumb,
+    analysis
+  });
+  entries.length = Math.min(entries.length, HISTORY_MAX);
+  // If the payload still does not fit, drop the oldest entries until it does.
+  let saved = false;
+  while (entries.length) {
+    saved = persistHistory(entries);
+    if (saved) break;
+    entries.pop();
+  }
+  if (!saved) { console.warn('Scan history storage is full; this scan was not saved.'); return; }
+  state.history = entries;
+  renderHistory();
+}
+
+function updateHistoryBadge() {
+  const n = state.history.length;
+  el['history-badge'].textContent = n;
+  el['history-badge'].style.display = n ? '' : 'none';
+}
+
+function renderHistory() {
+  if (!el['history-list']) return;
+  updateHistoryBadge();
+  el['history-count'].textContent = tr('historyCount', state.history.length);
+
+  if (!state.history.length) {
+    el['history-list'].innerHTML = `
+      <div class="history-empty">
+        <svg class="icon icon-xl" aria-hidden="true"><use href="#i-clock"/></svg>
+        <p>${esc(tr('historyEmpty'))}</p>
+        <span>${esc(tr('historyEmptySub'))}</span>
+      </div>`;
+    return;
+  }
+
+  const hi = state.lang === 'hi';
+  const badgeCls = { danger: 'badge-danger', caution: 'badge-caution', moderate: 'badge-moderate', safe: 'badge-safe' };
+  el['history-list'].innerHTML = state.history.map((e) => {
+    const a = e.analysis || {};
+    const safety = a.safety || {};
+    const meds = (a.medications || []).length;
+    const ix = (a.interactions || []).length;
+    const date = new Date(e.savedAt).toLocaleString(hi ? 'hi-IN' : 'en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    const badge = safety.level
+      ? `<span class="badge ${badgeCls[safety.level] || ''}">${esc(sentenceCase(hi ? safety.badge_hi : safety.badge_en, hi))}</span>`
+      : '';
+    const thumb = e.thumb
+      ? `<img src="${e.thumb}" alt="">`
+      : '<svg class="icon" aria-hidden="true"><use href="#i-file-text"/></svg>';
+    return `
+      <div class="history-item" data-id="${esc(e.id)}">
+        <div class="history-item-thumb">${thumb}</div>
+        <div class="history-item-body">
+          <div class="history-item-head">
+            <span class="history-item-title">${esc(e.name || '-')}</span>${badge}
+          </div>
+          <div class="history-item-meta">
+            <span>${esc(date)}</span>
+            <span>${meds} ${esc(tr('statMeds'))}</span>
+            <span>${ix} ${esc(tr('statIx'))}</span>
+          </div>
+        </div>
+        <div class="history-item-actions">
+          <button class="btn btn-secondary btn-sm" type="button" data-act="open">${esc(tr('btnOpenReport'))}</button>
+          <button class="icon-btn" type="button" data-act="delete" aria-label="${esc(tr('btnDelete'))}" title="${esc(tr('btnDelete'))}"><svg class="icon"><use href="#i-trash"/></svg></button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function onHistoryListClick(e) {
+  const item = e.target.closest('.history-item');
+  if (!item) return;
+  const id = item.dataset.id;
+  if (e.target.closest('[data-act="delete"]')) { deleteHistoryEntry(id); return; }
+  if (e.target.closest('[data-act="open"]') || !e.target.closest('button')) openHistoryEntry(id);
+}
+
+function deleteHistoryEntry(id) {
+  state.history = state.history.filter((e) => e.id !== id);
+  persistHistory(state.history);
+  renderHistory();
+}
+
+function clearHistory() {
+  if (!state.history.length) return;
+  if (!window.confirm(tr('confirmClearHistory'))) return;
+  state.history = [];
+  persistHistory(state.history);
+  renderHistory();
+}
+
+function openHistory() {
+  renderHistory();
+  el['modal-history'].classList.add('active');
+  el['btn-history-open'].setAttribute('aria-expanded', 'true');
+}
+
+function closeHistory() {
+  el['modal-history'].classList.remove('active');
+  el['btn-history-open'].setAttribute('aria-expanded', 'false');
+}
+
+function openHistoryEntry(id) {
+  const entry = state.history.find((e) => e.id === id);
+  if (!entry) return;
+  stopAudio();
+  closeHistory();
+  state.analysis = { success: true, image_data_url: entry.thumb || '', metadata: {}, analysis: entry.analysis };
+  state.analysisMeta = { name: entry.name, readSecs: entry.readSecs };
+  el['image-preview'].src = entry.thumb || '';
+  showView('results');
+  renderAnalysis(state.analysis, { animate: false });
 }

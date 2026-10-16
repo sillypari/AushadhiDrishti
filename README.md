@@ -1,18 +1,23 @@
+<div align="center">
+
 # AushadhiDrishti (औषधि दृष्टि)
 
-Multimodal Artificial Intelligence Prescription Scanner and Clinical Medication Safety Engine.
+### Multimodal Artificial Intelligence Prescription Scanner and Clinical Medication Safety Engine
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Backend Framework](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![Multimodal Vision](https://img.shields.io/badge/Vision%20Engine-Gemma%204%20Multimodal-4285F4.svg)](https://ai.google.dev/)
-[![Supported Languages](https://img.shields.io/badge/Languages-English%20%7C%20Hindi-orange.svg)](#bilingual-support)
+[![Supported Languages](https://img.shields.io/badge/Languages-English%20%7C%20Hindi-orange.svg)](#bilingual-accessibility-and-speech)
+
+</div>
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Application Screenshots](#application-screenshots)
 - [Clinical Motivation](#clinical-motivation)
 - [Core Architecture](#core-architecture)
 - [Key Capabilities](#key-capabilities)
@@ -32,6 +37,32 @@ Multimodal Artificial Intelligence Prescription Scanner and Clinical Medication 
 AushadhiDrishti (औषधि दृष्टि) is an end-to-end clinical workflow system designed to digitize handwritten medical prescriptions, identify pharmaceutical compounds, screen for contraindications and drug-drug interactions, and convert clinical instructions into patient-friendly daily regimens in both English and Hindi.
 
 The platform integrates computer vision, multimodal reasoning powered by Gemma 4, and an automated clinical pharmacology matrix. Designed for real-world clinical and patient environments, it supports camera captures, mobile uploads, speech synthesis (Text-to-Speech) for low-literacy or visually impaired patients, and printable medical schedules.
+
+---
+
+## Application Screenshots
+
+### 1. Prescription Ingestion and Demonstration Presets
+The clean interface allows users to upload local prescription images, take direct camera snapshots, or load pre-configured clinical evaluation samples.
+
+<p align="center">
+  <img src="AppScreenShot/127.0.0.1_8000_.png" alt="Prescription Ingestion Interface" width="95%" />
+</p>
+
+### 2. Real-Time Pipeline Telemetry and Preprocessing
+As images are submitted, the backend streams live progress events detailing upload validation, dynamic contrast and sharpness enhancement, and Gemma 4 multimodal neural extraction with an active elapsed timer.
+
+<p align="center">
+  <img src="AppScreenShot/127.0.0.1_8000_%20(1).png" alt="Analysis Progress Telemetry - Light Theme" width="48%" />
+  <img src="AppScreenShot/127.0.0.1_8000_%20(2).png" alt="Analysis Progress Telemetry - Dark Theme" width="48%" />
+</p>
+
+### 3. Clinical Extraction, Interaction Screening, and Daily Timetable
+Once extraction completes, the application displays an enhanced scan alongside extracted patient metadata, an overall safety score, plain-language patient advice with bilingual voice synthesis (TTS), pharmacological interaction alerts, and a structured three-slot daily schedule (Morning, Afternoon, Night).
+
+<p align="center">
+  <img src="AppScreenShot/127.0.0.1_8000_%20(3).png" alt="Clinical Analysis and Medication Timetable" width="95%" />
+</p>
 
 ---
 
@@ -133,6 +164,7 @@ AushadhiDrishti/
 ├── .env.example                # Template for environment configuration
 ├── .gitignore                  # Git exclusions (environment files, bytecode, caches)
 ├── README.md                   # Project documentation
+├── AppScreenShot/              # Interface demonstration screenshots
 ├── data/
 │   ├── drug_database.json      # Comprehensive drug catalog and generic mappings
 │   ├── interactions.json       # Clinical interaction rules and severity matrices
