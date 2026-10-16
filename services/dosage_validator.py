@@ -110,6 +110,40 @@ CLINICAL_MAX_DAILY_LIMITS: Dict[str, Dict[str, Any]] = {
     }
 }
 
+# Special population contraindications and demographic precautions
+DEMOGRAPHIC_PRECAUTIONS: Dict[str, Dict[str, Any]] = {
+    "aspirin": {
+        "pediatric_min_age": 18,
+        "pediatric_warning": "Contraindicated in children/adolescents due to Reye's syndrome risk.",
+        "pregnancy_contraindicated": True,
+        "pregnancy_warning": "Avoid in third trimester; risk of premature closure of ductus arteriosus."
+    },
+    "ciprofloxacin": {
+        "pediatric_min_age": 18,
+        "pediatric_warning": "Not recommended in patients under 18 due to musculoskeletal and cartilage toxicity.",
+        "pregnancy_contraindicated": True,
+        "pregnancy_warning": "Avoid during pregnancy unless alternative therapies are unavailable."
+    },
+    "atorvastatin": {
+        "pregnancy_contraindicated": True,
+        "pregnancy_warning": "Strictly contraindicated during pregnancy and breastfeeding (fetal harm risk)."
+    },
+    "losartan": {
+        "pregnancy_contraindicated": True,
+        "pregnancy_warning": "Black box warning: Discontinue immediately if pregnancy is detected (fetal toxicity)."
+    },
+    "ibuprofen": {
+        "geriatric_min_age": 65,
+        "geriatric_warning": "Elevated risk of gastrointestinal bleeding and renal impairment in elderly patients.",
+        "pregnancy_contraindicated": True,
+        "pregnancy_warning": "Avoid in late pregnancy (third trimester)."
+    },
+    "metformin": {
+        "geriatric_min_age": 65,
+        "geriatric_warning": "Elderly patients require renal function (eGFR) monitoring to avoid lactic acidosis."
+    }
+}
+
 
 def parse_dosage_value(dosage_str: str) -> Optional[float]:
     """Extract numeric dosage value in milligrams from strings like '500 mg', '0.5g', '100 mcg'."""
@@ -226,6 +260,64 @@ def validate_dosage_safety(
         "clinical_note": profile["notes"],
         "safety_flags": flags
     }
+
+
+def validate_special_population_safety(
+    drug_canonical_name: str,
+    patient_age: Optional[int] = None,
+    is_pregnant: bool = False
+) -> Dict[str, Any]:
+    """Evaluates demographic and special population risks (pediatric, geriatric, pregnancy)."""
+    key = drug_canonical_name.strip().lower()
+    rules = DEMOGRAPHIC_PRECAUTIONS.get(key, {})
+    warnings = []
+    contraindicated = False
+
+    if is_pregnant and rules.get("pregnancy_contraindicated"):
+        contraindicated = True
+        warnings.append(rules.get("pregnancy_warning", "Contraindicated in pregnancy."))
+
+    if patient_age is not None:
+        ped_limit = rules.get("pediatric_min_age")
+        if ped_limit and patient_age < ped_limit:
+            contraindicated = True
+            warnings.append(rules.get("pediatric_warning", f"Not recommended under {ped_limit} years of age."))
+
+        ger_limit = rules.get("geriatric_min_age")
+        if ger_limit and patient_age >= ger_limit:
+            warnings.append(rules.get("geriatric_warning", "Geriatric precautions apply."))
+
+    return {
+        "drug": drug_canonical_name,
+        "contraindicated": contraindicated,
+        "demographic_warnings": warnings
+    }
+
+
+def generate_bilingual_dosage_advisory(audit: Dict[str, Any], lang: str = "en") -> str:
+    """Generates localized patient-friendly advisory text for UI cards or Voice TTS."""
+    status = audit.get("status", "safe")
+    flags = audit.get("safety_flags", [])
+
+    if lang == "hi":
+        if status == "safe":
+            return "निर्धारित खुराक सुरक्षित नैदानिक सीमा के भीतर है।"
+        elif status == "warning":
+            return f"सावधानी: यह खुराक दैनिक सीमा के निकट है। {audit.get('clinical_note', '')}"
+        elif status == "exceeded":
+            first_flag = flags[0] if flags else "खुराक अनुशंसित दैनिक सीमा से अधिक है।"
+            return f"चेतावनी: {first_flag} कृपया डॉक्टर से पुष्टि करें।"
+        return "खुराक की जानकारी की पुष्टि अपने फार्मासिस्ट से करें।"
+
+    # Default English
+    if status == "safe":
+        return "Prescribed dosage is within standard clinical safety limits."
+    elif status == "warning":
+        return f"Precaution: Daily intake approaches upper ceiling. {audit.get('clinical_note', '')}"
+    elif status == "exceeded":
+        first_flag = flags[0] if flags else "Dosage exceeds maximum recommended limits."
+        return f"Warning: {first_flag} Please verify with your prescribing physician."
+    return "Standard dosing guidelines unverified. Consult your pharmacist."
 
 
 def batch_validate_prescriptions(medications: List[Dict[str, Any]]) -> Dict[str, Any]:
