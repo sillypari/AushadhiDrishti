@@ -5,7 +5,7 @@ routes against established clinical safety guidelines to flag accidental
 overdoses or sub-therapeutic prescriptions.
 """
 
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, List, Optional
 import re
 
 # Standard adult daily therapeutic limits (in mg unless specified)
@@ -65,15 +65,65 @@ CLINICAL_MAX_DAILY_LIMITS: Dict[str, Dict[str, Any]] = {
         "warning_threshold_mg": 500.0,
         "unit": "mg",
         "notes": "Once-daily regimen; monitor QTc interval."
+    },
+    "ciprofloxacin": {
+        "max_single_dose_mg": 750.0,
+        "max_daily_dose_mg": 1500.0,
+        "warning_threshold_mg": 1000.0,
+        "unit": "mg",
+        "notes": "Avoid concurrent multivalent cations (calcium/iron/antacids)."
+    },
+    "cetirizine": {
+        "max_single_dose_mg": 10.0,
+        "max_daily_dose_mg": 10.0,
+        "warning_threshold_mg": 10.0,
+        "unit": "mg",
+        "notes": "Second-generation antihistamine; bedtime dosing recommended."
+    },
+    "omeprazole": {
+        "max_single_dose_mg": 40.0,
+        "max_daily_dose_mg": 80.0,
+        "warning_threshold_mg": 40.0,
+        "unit": "mg",
+        "notes": "Optimal when taken prior to first meal of the day."
+    },
+    "losartan": {
+        "max_single_dose_mg": 100.0,
+        "max_daily_dose_mg": 100.0,
+        "warning_threshold_mg": 50.0,
+        "unit": "mg",
+        "notes": "Monitor serum potassium and renal parameters regularly."
+    },
+    "metoprolol": {
+        "max_single_dose_mg": 100.0,
+        "max_daily_dose_mg": 200.0,
+        "warning_threshold_mg": 100.0,
+        "unit": "mg",
+        "notes": "Beta-blocker; monitor resting heart rate and blood pressure."
+    },
+    "levothyroxine": {
+        "max_single_dose_mg": 0.3,
+        "max_daily_dose_mg": 0.3,
+        "warning_threshold_mg": 0.2,
+        "unit": "mg",
+        "notes": "Dosed in micrograms (mcg); administer on an empty stomach."
     }
 }
 
 
 def parse_dosage_value(dosage_str: str) -> Optional[float]:
-    """Extract numeric dosage value in milligrams from strings like '500 mg', '0.5g', '10mg'."""
+    """Extract numeric dosage value in milligrams from strings like '500 mg', '0.5g', '100 mcg'."""
     if not dosage_str:
         return None
     cleaned = dosage_str.strip().lower()
+
+    # Micrograms to milligrams conversion (mcg, ug, μg)
+    mcg_match = re.search(r"([\d.]+)\s*(?:mcg|ug|μg)\b", cleaned)
+    if mcg_match:
+        try:
+            return float(mcg_match.group(1)) / 1000.0
+        except ValueError:
+            pass
     
     # Gram to milligram conversion
     g_match = re.search(r"([\d.]+)\s*g\b", cleaned)
@@ -175,4 +225,47 @@ def validate_dosage_safety(
         "max_daily_limit_mg": profile["max_daily_dose_mg"],
         "clinical_note": profile["notes"],
         "safety_flags": flags
+    }
+
+
+def batch_validate_prescriptions(medications: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Audits an entire prescription regimen for dosage range compliance.
+    
+    Args:
+        medications: List of medication dicts containing at least:
+                     - 'name' or 'medicine_name'
+                     - 'dosage' (e.g. '500 mg')
+                     - 'frequency' (e.g. '1-0-1')
+                     
+    Returns:
+        Structured batch validation summary with counts and per-medication findings.
+    """
+    results = []
+    has_exceeded = False
+    has_warning = False
+
+    for med in medications:
+        name = med.get("name") or med.get("medicine_name") or med.get("drug") or ""
+        dosage = med.get("dosage", "")
+        frequency = med.get("frequency", "")
+
+        audit = validate_dosage_safety(name, dosage, frequency)
+        if audit["status"] == "exceeded":
+            has_exceeded = True
+        elif audit["status"] == "warning":
+            has_warning = True
+
+        results.append({
+            "medication": name,
+            "prescribed_dosage": dosage,
+            "frequency": frequency,
+            "audit": audit
+        })
+
+    overall_status = "exceeded" if has_exceeded else ("warning" if has_warning else "safe")
+
+    return {
+        "overall_status": overall_status,
+        "total_medications_checked": len(medications),
+        "results": results
     }
