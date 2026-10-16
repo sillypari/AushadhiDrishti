@@ -1,8 +1,12 @@
 import os
 import io
+import json
+import time
+import asyncio
+from urllib.parse import urlparse
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from dotenv import load_dotenv
@@ -130,19 +134,145 @@ async def list_samples():
     ]
 
 
-@app.post("/api/analyze-sample/{preset_id}")
-async def analyze_sample(preset_id: str):
-    """Analyzes a built-in sample prescription image."""
+SAMPLE_IDS = ("cardio_diabetic", "infection_fever", "arthritis_pain")
+
+
+def _load_sample_bytes(preset_id: str) -> bytes:
+    """Returns the bytes of a built-in sample prescription, generating it on first use."""
+    if preset_id not in SAMPLE_IDS:
+        raise HTTPException(status_code=404, detail="Unknown sample prescription.")
     sample_path = os.path.join(STATIC_DIR, "samples", f"{preset_id}.jpg")
     if not os.path.exists(sample_path):
-        # Generate on the fly if missing
         b, _ = generate_sample_prescription(preset_id)
+        os.makedirs(os.path.dirname(sample_path), exist_ok=True)
         with open(sample_path, "wb") as f:
             f.write(b)
-
     with open(sample_path, "rb") as f:
-        raw_bytes = f.read()
+        return f.read()
 
+
+def _evt(payload: dict) -> str:
+    """Serialises one NDJSON progress event."""
+    return json.dumps(payload, ensure_ascii=False) + "\n"
+
+
+def _stage(stage_id: str, status: str, data: Optional[dict] = None) -> str:
+    return _evt({"type": "stage", "id": stage_id, "status": status, "data": data or {}})
+
+
+async def _analysis_events(raw_bytes: bytes, filename: str):
+    """
+    Runs the analysis pipeline and yields NDJSON progress events as each stage finishes,
+    so the UI can report real progress instead of guessing.
+    Stages: upload -> enhance -> vision -> screening -> report.
+    """
+    started = time.perf_counter()
+    extraction_task = None
+    try:
+        yield _stage("upload", "done", {"filename": filename, "size_bytes": len(raw_bytes)})
+
+        # Image enhancement
+        yield _stage("enhance", "active")
+        try:
+            processed_bytes, data_url, meta = await asyncio.to_thread(preprocess_prescription_image, raw_bytes)
+        except Exception:
+            yield _evt({"type": "error", "stage": "enhance",
+                        "message": "This file could not be read as an image. Upload a JPG, PNG or WebP photo."})
+            return
+        meta = dict(meta)
+        meta["processed_size_bytes"] = len(processed_bytes)
+        yield _stage("enhance", "done", {**meta, "image_data_url": data_url})
+
+        # Prescription reading (the slow step: send heartbeats so the UI shows live elapsed time)
+        engine_info = gemma_client.active_engine()
+        host = urlparse(gemma_client.api_base).netloc or gemma_client.api_base
+        yield _stage("vision", "active", {**engine_info, "host": host})
+        extraction_task = asyncio.create_task(gemma_client.extract_prescription(processed_bytes, filename=filename))
+        vision_started = time.perf_counter()
+        while True:
+            finished, _ = await asyncio.wait({extraction_task}, timeout=1.0)
+            if finished:
+                break
+            yield _evt({"type": "tick", "stage": "vision", "elapsed": round(time.perf_counter() - vision_started, 1)})
+        extraction = extraction_task.result()
+
+        raw = extraction["raw"]
+        raw_meds = [m for m in raw.get("medications", []) if isinstance(m, dict)]
+        patient = raw.get("patient") if isinstance(raw.get("patient"), dict) else {}
+        yield _stage("vision", "done", {
+            "engine": extraction["engine"],
+            "model": extraction["model"],
+            "fallback_reason": extraction["fallback_reason"],
+            "elapsed": round(time.perf_counter() - vision_started, 1),
+            "patient_name": patient.get("name"),
+            "medications": [
+                {"name": m.get("name", "Unknown"), "dosage": m.get("dosage", ""), "frequency": m.get("frequency", "")}
+                for m in raw_meds
+            ],
+        })
+
+        # Interaction screening + enrichment
+        yield _stage("screening", "active")
+        analysis = await asyncio.to_thread(gemma_client.enrich, raw, extraction["source"])
+        severities = [a.get("severity") for a in analysis["interactions"]]
+        yield _stage("screening", "done", {
+            **analysis["screening"],
+            "alerts": len(severities),
+            "contraindicated": severities.count("contraindicated"),
+            "major": severities.count("major"),
+            "moderate": severities.count("moderate"),
+        })
+
+        # Report
+        yield _stage("report", "active")
+        yield _stage("report", "done", {"languages": ["en", "hi"], "total_elapsed": round(time.perf_counter() - started, 1)})
+
+        yield _evt({"type": "result", "payload": {
+            "success": True,
+            "image_data_url": data_url,
+            "metadata": meta,
+            "analysis": analysis,
+        }})
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        print(f"[analysis] pipeline error: {type(e).__name__}: {e}")
+        yield _evt({"type": "error", "stage": "pipeline", "message": "Analysis failed unexpectedly. Please try again."})
+    finally:
+        if extraction_task is not None and not extraction_task.done():
+            extraction_task.cancel()
+
+
+def _stream(raw_bytes: bytes, filename: str) -> StreamingResponse:
+    return StreamingResponse(
+        _analysis_events(raw_bytes, filename),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/api/analyze-sample/{preset_id}/stream")
+async def analyze_sample_stream(preset_id: str):
+    """Streams progress events while analyzing a built-in sample prescription."""
+    return _stream(_load_sample_bytes(preset_id), f"{preset_id}.jpg")
+
+
+@app.post("/api/analyze/stream")
+async def analyze_prescription_stream(file: UploadFile = File(...)):
+    """Streams progress events while analyzing an uploaded prescription."""
+    try:
+        raw_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {e}")
+    if len(raw_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    return _stream(raw_bytes, file.filename or "upload.jpg")
+
+
+@app.post("/api/analyze-sample/{preset_id}")
+async def analyze_sample(preset_id: str):
+    """Analyzes a built-in sample prescription image (non-streaming)."""
+    raw_bytes = _load_sample_bytes(preset_id)
     processed_bytes, data_url, meta = preprocess_prescription_image(raw_bytes)
     analysis = await gemma_client.analyze_prescription(processed_bytes, filename=f"{preset_id}.jpg")
     

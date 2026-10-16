@@ -6,6 +6,9 @@ import httpx
 from typing import Dict, Any, List, Optional
 from services.interaction_engine import ClinicalInteractionEngine
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Load environment defaults
 GEMMA_API_KEY = os.getenv("GEMMA_API_KEY", "")
 GEMMA_API_BASE = os.getenv("GEMMA_API_BASE", "https://generativelanguage.googleapis.com/v1beta")
@@ -16,9 +19,9 @@ FALLBACK_MODE = os.getenv("FALLBACK_MODE", "true").lower() == "true"
 class GemmaClient:
     def __init__(self, interaction_engine: ClinicalInteractionEngine):
         self.engine = interaction_engine
-        self.api_key = GEMMA_API_KEY
-        self.api_base = GEMMA_API_BASE
-        self.model_name = self._normalize_model(GEMMA_MODEL)
+        self.api_key = os.getenv("GEMMA_API_KEY", GEMMA_API_KEY).strip()
+        self.api_base = os.getenv("GEMMA_API_BASE", GEMMA_API_BASE).strip()
+        self.model_name = self._normalize_model(os.getenv("GEMMA_MODEL", GEMMA_MODEL))
 
     def _normalize_model(self, model: str) -> str:
         m = (model or "").strip()
@@ -34,10 +37,27 @@ class GemmaClient:
         if model is not None and model.strip():
             self.model_name = self._normalize_model(model)
 
-    async def analyze_prescription(self, image_bytes: bytes, filename: str = "prescription.jpg", config_override: Optional[dict] = None) -> Dict[str, Any]:
+    @staticmethod
+    def _describe_error(exc: Exception, api_key: str) -> str:
+        """Short, key-safe description of an API failure (httpx errors embed the request URL, which carries the key)."""
+        if isinstance(exc, httpx.HTTPStatusError):
+            return f"HTTP {exc.response.status_code} from model endpoint"
+        if isinstance(exc, httpx.TimeoutException):
+            return "Model endpoint timed out"
+        if isinstance(exc, httpx.RequestError):
+            return "Could not reach model endpoint"
+        msg = f"{type(exc).__name__}: {exc}"
+        return msg.replace(api_key, "***") if api_key else msg
+
+    def active_engine(self, config_override: Optional[dict] = None) -> Dict[str, str]:
+        """Describes which engine will serve the next request (used for progress reporting)."""
+        api_key = (config_override or {}).get("api_key") or self.api_key
+        return {"engine": "live" if api_key else "offline", "model": self.model_name}
+
+    async def extract_prescription(self, image_bytes: bytes, filename: str = "prescription.jpg", config_override: Optional[dict] = None) -> Dict[str, Any]:
         """
-        Analyzes prescription image using Gemma 4 API.
-        If API key is absent or call fails, gracefully executes clinical heuristic fallback.
+        Stage 1: reads the prescription (live Gemma call, or offline engine as fallback).
+        Returns {"raw", "source", "engine", "model", "fallback_reason"}.
         """
         api_key = self.api_key
         api_base = self.api_base
@@ -51,18 +71,44 @@ class GemmaClient:
             if config_override.get("model"):
                 model = self._normalize_model(config_override["model"])
 
-        # If API key is provided, attempt live Gemma / Vision API call
+        reason = None
         if api_key:
             try:
                 result = await self._call_gemma_api(image_bytes, api_key, api_base, model)
                 if result and result.get("medications"):
-                    return self._enrich_analysis(result, source=f"Gemma 4 Live API ({model})")
+                    return {
+                        "raw": result,
+                        "source": f"Gemma 4 Live API ({model})",
+                        "engine": "live",
+                        "model": model,
+                        "fallback_reason": None,
+                    }
+                reason = "Model returned no medications"
             except Exception as e:
-                print(f"[GemmaClient] Live API call encountered an error: {e}. Engaging clinical heuristic engine...")
+                reason = self._describe_error(e, api_key)
+            print(f"[GemmaClient] Live API unavailable ({reason}). Engaging clinical heuristic engine...")
+        else:
+            reason = "No API key configured"
 
-        # Graceful Clinical Engine Fallback (Guaranteed to return structured, validated output)
-        fallback_data = self._generate_intelligent_fallback(image_bytes, filename)
-        return self._enrich_analysis(fallback_data, source="AushadhiDrishti Clinical Engine (Offline Mode)")
+        return {
+            "raw": self._generate_intelligent_fallback(image_bytes, filename),
+            "source": "AushadhiDrishti Clinical Engine (Offline Mode)",
+            "engine": "offline",
+            "model": "offline-clinical-engine",
+            "fallback_reason": reason,
+        }
+
+    def enrich(self, raw_data: Dict[str, Any], source: str) -> Dict[str, Any]:
+        """Stage 2: database enrichment, interaction screening, bilingual summaries."""
+        return self._enrich_analysis(raw_data, source)
+
+    async def analyze_prescription(self, image_bytes: bytes, filename: str = "prescription.jpg", config_override: Optional[dict] = None) -> Dict[str, Any]:
+        """
+        Analyzes prescription image using Gemma 4 API.
+        If API key is absent or call fails, gracefully executes clinical heuristic fallback.
+        """
+        extraction = await self.extract_prescription(image_bytes, filename, config_override)
+        return self.enrich(extraction["raw"], extraction["source"])
 
     async def _call_gemma_api(self, image_bytes: bytes, api_key: str, api_base: str, model: str) -> Dict[str, Any]:
         """Calls Google Generative AI / OpenAI-compatible Gemma endpoint with multimodal vision payload."""
@@ -307,8 +353,17 @@ class GemmaClient:
         # Generate Patient Friendly Summary (Dual Language)
         summary_en, summary_hi = self._generate_patient_summaries(enriched_meds, alerts, safety_score)
 
+        unique_keys = len(set(canonical_keys))
+        screening = {
+            "medications_total": len(enriched_meds),
+            "medications_matched": sum(1 for m in enriched_meds if m["identified"]),
+            "pairs_checked": unique_keys * (unique_keys - 1) // 2,
+            "rules_total": len(self.engine.interactions),
+        }
+
         return {
             "source": source,
+            "screening": screening,
             "patient": raw_data.get("patient", {}),
             "medications": enriched_meds,
             "interactions": alerts,

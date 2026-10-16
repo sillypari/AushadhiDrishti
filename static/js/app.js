@@ -1,698 +1,983 @@
 /**
- * AushadhiDrishti (औषधि दृष्टि) - Client Application Controller
- * Multilingual AI Prescription Scanner powered by Gemma 4
+ * AushadhiDrishti - client application
+ * Streams real pipeline progress from the server and renders the clinical report.
  */
 
-// Global State
-const state = {
-  currentLang: localStorage.getItem('ad_lang') || 'en',
-  currentTheme: localStorage.getItem('ad_theme') || 'dark',
-  currentAnalysis: null,
-  activeSpeech: null,
-  isAnalyzing: false,
-  apiConfig: {
-    apiKeySet: false,
-    model: 'gemma-4-it',
-    apiBase: 'https://generativelanguage.googleapis.com/v1beta'
-  }
-};
+'use strict';
 
-// Bilingual UI Dictionary
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const STAGES = [
+  { id: 'upload', weight: 6 },
+  { id: 'enhance', weight: 14 },
+  { id: 'vision', weight: 60 },
+  { id: 'screening', weight: 14 },
+  { id: 'report', weight: 6 }
+];
+
+const state = {
+  lang: localStorage.getItem('ad_lang') || 'en',
+  theme: localStorage.getItem('ad_theme_v2') || 'light',
+  analysis: null,
+  speaking: false,
+  samples: [],
+  run: null,
+  view: 'input'
+};
+let runSeq = 0;
+
+/* --------------------------------------------------------------------------
+   Strings
+   -------------------------------------------------------------------------- */
 const I18N = {
   en: {
-    appTitle: 'Aushadhi<span class="brand-gradient">Drishti</span>',
-    appTagline: 'AI Prescription Intelligence & Safety Scanner',
-    heroPill: '⚡ Powered by Gemma 4 Multimodal Vision',
-    heroTitle: 'Decode Any Prescription with <span>Clinical Precision</span>',
-    heroDesc: 'Eliminate doctor handwriting confusion, prevent dangerous drug-drug interactions, and view clear bilingual medication timetables.',
-    dropTitle: 'Upload Doctor Prescription Scan',
-    dropSub: 'Drag & drop image here, browse file, or snap with mobile camera',
-    btnBrowse: '📁 Choose File',
-    btnCamera: '📷 Take Photo',
-    presetsTitle: '⚡ Quick Demo Prescriptions',
-    badgeQuick: '1-Click Test',
-    loadingTitle: 'AI Clinical Engine Analyzing...',
-    loadingSub: 'Processing handwriting with Gemma 4 Vision & Pharmacology Safety Matrix',
-    step1: 'Contrast & Edge Enhancement',
-    step2: 'Gemma 4 Multimodal Vision',
-    step3: 'Drug Interaction Verification',
-    step4: 'Bilingual Timetable Synthesis',
-    viewerTitle: 'Enhanced Prescription Scan',
-    patientDetails: 'Patient Case Profile',
-    lblPatient: 'Patient Name',
-    lblDoctor: 'Doctor / Clinic',
+    appTitle: 'AushadhiDrishti',
+    appTagline: 'Prescription scanner and medication safety',
+    themeDark: 'Dark mode',
+    themeLight: 'Light mode',
+    btnSettings: 'API settings',
+    heroPill: 'Gemma 4 multimodal vision',
+    heroTitle: 'Read any prescription. Check it for unsafe combinations.',
+    heroDesc: 'Upload a photo of a prescription to extract each medicine, screen for drug interactions, and get a daily timetable in English and Hindi.',
+    dropTitle: 'Upload a prescription image',
+    dropSub: 'Drag and drop a file here, or choose one. JPG, PNG or WebP.',
+    btnBrowse: 'Choose file',
+    btnCamera: 'Take photo',
+    presetsTitle: 'Sample prescriptions',
+    presetsNote: 'Run the pipeline on a built-in example.',
+    tagSafe: 'Routine',
+    tagAcute: 'Acute care',
+    tagDanger: 'High risk',
+
+    docTitle: 'Document',
+    badgeScanning: 'Scanning',
+    badgeDone: 'Complete',
+    badgeFailed: 'Failed',
+    progressTitle: 'Analysis progress',
+    btnCancel: 'Cancel',
+    errTitle: 'Analysis could not be completed',
+    btnBack: 'Back to upload',
+    errNetwork: 'Could not reach the server. Check that the app is running and try again.',
+    errNotImage: 'That file is not an image. Choose a JPG, PNG or WebP photo.',
+    errNoResult: 'The server closed the connection before sending a result.',
+    elapsedLabel: (s) => `${s} s`,
+    stepOf: (n, total, name) => `Step ${n} of ${total}: ${name}`,
+    allDone: 'All steps complete',
+    failedAt: (name) => `Stopped at: ${name}`,
+
+    stage_upload: 'File received',
+    stage_enhance: 'Image enhancement',
+    stage_vision: 'Reading the prescription',
+    stage_screening: 'Interaction screening',
+    stage_report: 'Building the report',
+
+    upload_done: (size) => `Received ${size}`,
+    enhance_active: 'Correcting orientation, contrast and sharpness',
+    enhance_done: (ow, oh, pw, ph) => `Resized ${ow} x ${oh} px to ${pw} x ${ph} px`,
+    kvContrast: 'Contrast',
+    kvSharpness: 'Sharpness',
+    kvOutput: 'Output',
+    vision_active_live: (model, host, s) => `Waiting for ${model} on ${host} (${s} s)`,
+    vision_active_offline: 'Preparing the offline engine',
+    vision_slow: 'This is taking longer than usual. The model is still working.',
+    vision_done_live: (n, s) => `${n} medicine${n === 1 ? '' : 's'} extracted in ${s} s`,
+    vision_done_offline: (n, reason) => `Offline engine used (${reason}). ${n} medicine${n === 1 ? '' : 's'} returned from built-in demo data; the image itself was not read by a model.`,
+    kvModel: 'Model',
+    kvEndpoint: 'Endpoint',
+    kvPatient: 'Patient',
+    screening_active: 'Matching names to the drug database and checking every pair',
+    screening_done: (matched, total, pairs, rules) => `${matched} of ${total} medicines matched. ${pairs} pair${pairs === 1 ? '' : 's'} checked against ${rules} rules`,
+    kvFound: 'Interactions found',
+    kvNone: 'No interactions found',
+    report_active: 'Writing the English and Hindi summary and timetable',
+    report_done: 'Report ready',
+
+    meta_name: 'File',
+    meta_size: 'Size',
+    meta_type: 'Type',
+    meta_original: 'Original (px)',
+    meta_enhanced: 'Enhanced (px)',
+    meta_model: 'Model',
+
+    viewerTitle: 'Enhanced scan',
+    patientDetails: 'Prescription details',
+    lblPatient: 'Patient',
+    lblVitals: 'Age / sex',
+    lblDoctor: 'Doctor',
     lblDate: 'Date',
-    lblVitals: 'Demographics',
-    summaryTitle: 'Patient Friendly Overview',
-    btnListen: '🔊 Listen Aloud',
-    btnStopListen: '⏹️ Stop Audio',
-    interactionsTitle: '⚠️ Drug-Drug Interaction Safety Alerts',
-    noInteractions: '✅ No adverse drug-drug interactions detected. Safe to administer as prescribed.',
-    scheduleTitle: '📅 Daily Medication Timetable',
-    slotMorning: '☀️ Morning (सुबह)',
-    slotAfternoon: '🌤️ Afternoon (दोपहर)',
-    slotNight: '🌙 Night (रात)',
-    medsListTitle: '💊 Identified Medications & Clinical Guidance',
-    lblDosage: 'Dosage',
-    lblTiming: 'Timing & Food Instruction',
-    lblUses: 'Purpose / Uses',
-    lblWarnings: 'Precautions & Warnings',
-    btnDownloadPDF: '📥 Print / Save Medical Card',
-    btnScanNew: '🔄 Scan Another Prescription',
-    btnSettings: '⚙️ API Settings',
-    settingsTitle: 'Gemma 4 API Configuration',
-    lblApiKey: 'API Key (Google AI Studio / Groq / OpenRouter / Custom)',
-    lblApiBase: 'API Base URL',
-    lblModel: 'Model Identifier',
-    btnSaveConfig: 'Save Configuration',
-    disclaimer: '⚕️ Medical Disclaimer: AushadhiDrishti is an AI-powered assistant designed for educational and informational support. Always consult a certified physician or pharmacist before changing or stopping medications.'
+    unspecified: 'Not stated',
+    summaryTitle: 'Plain-language summary',
+    btnListen: 'Listen',
+    btnStopListen: 'Stop',
+    interactionsTitle: 'Drug interaction screening',
+    noInteractions: 'No harmful interactions were found between the identified medicines.',
+    sevContraindicated: 'Contraindicated',
+    sevMajor: 'Major',
+    sevModerate: 'Moderate',
+    recommended: 'Recommended action:',
+    scheduleTitle: 'Daily timetable',
+    slotMorning: 'Morning',
+    slotAfternoon: 'Afternoon',
+    slotNight: 'Night',
+    slotEmpty: 'None',
+    medsListTitle: 'Medications and guidance',
+    lblDosage: 'Schedule',
+    lblTiming: 'Timing and food',
+    lblDuration: 'Duration',
+    lblUses: 'Purpose',
+    lblWarnings: 'Warning:',
+    notInDb: 'Not in database',
+    btnDownloadPDF: 'Print or save as PDF',
+    btnScanNew: 'Scan another prescription',
+    sourceLive: 'Gemma 4',
+    sourceOffline: 'Offline engine',
+    disclaimer: 'Medical disclaimer: AushadhiDrishti is an AI assistant for educational and informational use. Consult a licensed physician or pharmacist before starting, changing or stopping any medication.',
+
+    settingsTitle: 'Gemma 4 API configuration',
+    lblApiKey: 'API key',
+    lblApiBase: 'API base URL',
+    lblModel: 'Model identifier',
+    settingsHint: 'Without an API key the app uses its built-in offline engine, which returns fixed demo data instead of reading the image.',
+    btnSaveConfig: 'Save',
+    settingsSaved: 'Configuration saved.',
+    settingsFailed: 'Could not save configuration.',
+    keyConfigured: (k) => `Configured (${k})`,
+    ttsUnsupported: 'Text-to-speech is not supported in this browser.'
   },
   hi: {
-    appTitle: 'औषधि <span class="brand-gradient">दृष्टि</span>',
-    appTagline: 'एआई पर्चा विश्लेषक एवं दवा सुरक्षा प्रणाली',
-    heroPill: '⚡ जेमा ४ (Gemma 4) मल्टीमॉडल विज़न द्वारा संचालित',
-    heroTitle: 'डॉक्टर का लिखा पर्चा समझें <span>पूर्ण सटीकता के साथ</span>',
-    heroDesc: 'खराब लिखावट की उलझन दूर करें, दवाओं के खतरनाक टकराव से बचें और आसान भाषा में दैनिक दवा समय-सारणी पाएं।',
-    dropTitle: 'डॉक्टर का पर्चा (प्रिस्क्रिप्शन) अपलोड करें',
-    dropSub: 'तस्वीर यहां खींचकर लाएं, फाइल चुनें या मोबाइल कैमरे से फोटो खींचें',
-    btnBrowse: '📁 फाइल चुनें',
-    btnCamera: '📷 फोटो खींचें',
-    presetsTitle: '⚡ तैयार डेमो पर्चे (परीक्षण हेतु)',
-    badgeQuick: '1-क्लिक टेस्ट',
-    loadingTitle: 'एआई क्लीनिकल इंजन विश्लेषण कर रहा है...',
-    loadingSub: 'जेमा ४ विज़न और औषधीय सुरक्षा मैट्रिक्स द्वारा लिखावट की जांच जारी है',
-    step1: 'छवि स्पष्टता एवं कंट्रास्ट सुधार',
-    step2: 'जेमा ४ मल्टीमॉडल स्कैनिंग',
-    step3: 'दवा टकराव व सुरक्षा जांच',
-    step4: 'द्विभाषी समय-सारणी निर्माण',
-    viewerTitle: 'स्पष्ट किया गया पर्चा',
-    patientDetails: 'मरीज़ एवं डॉक्टर का विवरण',
-    lblPatient: 'मरीज़ का नाम',
-    lblDoctor: 'चिकित्सक / अस्पताल',
+    appTitle: 'औषधि दृष्टि',
+    appTagline: 'पर्चा स्कैनर और दवा सुरक्षा',
+    themeDark: 'डार्क मोड',
+    themeLight: 'लाइट मोड',
+    btnSettings: 'API सेटिंग्स',
+    heroPill: 'Gemma 4 मल्टीमॉडल विज़न',
+    heroTitle: 'किसी भी पर्चे को पढ़ें और असुरक्षित दवा संयोजन जांचें।',
+    heroDesc: 'पर्चे की फोटो अपलोड करें। हर दवा पहचानी जाएगी, दवाओं के आपसी टकराव की जांच होगी और हिन्दी व अंग्रेज़ी में दैनिक समय-सारणी मिलेगी।',
+    dropTitle: 'पर्चे की तस्वीर अपलोड करें',
+    dropSub: 'फ़ाइल यहां खींचकर छोड़ें या चुनें। JPG, PNG या WebP।',
+    btnBrowse: 'फ़ाइल चुनें',
+    btnCamera: 'फोटो खींचें',
+    presetsTitle: 'नमूना पर्चे',
+    presetsNote: 'पहले से मौजूद उदाहरण पर जांच चलाएं।',
+    tagSafe: 'सामान्य',
+    tagAcute: 'तीव्र रोग',
+    tagDanger: 'उच्च जोखिम',
+
+    docTitle: 'दस्तावेज़',
+    badgeScanning: 'स्कैन हो रहा है',
+    badgeDone: 'पूर्ण',
+    badgeFailed: 'विफल',
+    progressTitle: 'विश्लेषण की प्रगति',
+    btnCancel: 'रद्द करें',
+    errTitle: 'विश्लेषण पूरा नहीं हो सका',
+    btnBack: 'अपलोड पर वापस जाएं',
+    errNetwork: 'सर्वर से संपर्क नहीं हो सका। जांचें कि ऐप चालू है और दोबारा प्रयास करें।',
+    errNotImage: 'यह फ़ाइल तस्वीर नहीं है। JPG, PNG या WebP फोटो चुनें।',
+    errNoResult: 'परिणाम भेजे जाने से पहले सर्वर ने कनेक्शन बंद कर दिया।',
+    elapsedLabel: (s) => `${s} सेकंड`,
+    stepOf: (n, total, name) => `चरण ${n}/${total}: ${name}`,
+    allDone: 'सभी चरण पूर्ण',
+    failedAt: (name) => `यहां रुका: ${name}`,
+
+    stage_upload: 'फ़ाइल प्राप्त',
+    stage_enhance: 'छवि सुधार',
+    stage_vision: 'पर्चा पढ़ना',
+    stage_screening: 'दवा टकराव जांच',
+    stage_report: 'रिपोर्ट तैयार करना',
+
+    upload_done: (size) => `${size} प्राप्त हुआ`,
+    enhance_active: 'दिशा, कंट्रास्ट और स्पष्टता सुधारी जा रही है',
+    enhance_done: (ow, oh, pw, ph) => `${ow} x ${oh} px से ${pw} x ${ph} px किया गया`,
+    kvContrast: 'कंट्रास्ट',
+    kvSharpness: 'स्पष्टता',
+    kvOutput: 'आउटपुट',
+    vision_active_live: (model, host, s) => `${host} पर ${model} के उत्तर की प्रतीक्षा (${s} सेकंड)`,
+    vision_active_offline: 'ऑफ़लाइन इंजन तैयार किया जा रहा है',
+    vision_slow: 'सामान्य से अधिक समय लग रहा है। मॉडल अभी काम कर रहा है।',
+    vision_done_live: (n, s) => `${s} सेकंड में ${n} दवाएं निकाली गईं`,
+    vision_done_offline: (n, reason) => `ऑफ़लाइन इंजन उपयोग हुआ (${reason})। अंतर्निहित डेमो डेटा से ${n} दवाएं मिलीं; तस्वीर को किसी मॉडल ने नहीं पढ़ा।`,
+    kvModel: 'मॉडल',
+    kvEndpoint: 'एंडपॉइंट',
+    kvPatient: 'मरीज़',
+    screening_active: 'दवाओं के नाम डेटाबेस से मिलाए जा रहे हैं और हर जोड़ी जांची जा रही है',
+    screening_done: (matched, total, pairs, rules) => `${total} में से ${matched} दवाएं मिलीं। ${rules} नियमों के विरुद्ध ${pairs} जोड़ियां जांची गईं`,
+    kvFound: 'मिले टकराव',
+    kvNone: 'कोई टकराव नहीं मिला',
+    report_active: 'हिन्दी और अंग्रेज़ी सारांश व समय-सारणी बन रही है',
+    report_done: 'रिपोर्ट तैयार',
+
+    meta_name: 'फ़ाइल',
+    meta_size: 'आकार',
+    meta_type: 'प्रकार',
+    meta_original: 'मूल (px)',
+    meta_enhanced: 'सुधारी गई (px)',
+    meta_model: 'मॉडल',
+
+    viewerTitle: 'सुधारा गया स्कैन',
+    patientDetails: 'पर्चे का विवरण',
+    lblPatient: 'मरीज़',
+    lblVitals: 'उम्र / लिंग',
+    lblDoctor: 'चिकित्सक',
     lblDate: 'तारीख',
-    lblVitals: 'उम्र एवं लिंग',
-    summaryTitle: 'मरीज़ हेतु सरल सारांश',
-    btnListen: '🔊 बोलकर सुनाएं',
-    btnStopListen: '⏹️ आवाज़ बंद करें',
-    interactionsTitle: '⚠️ दवाओं के आपसी टकराव की चेतावनी',
-    noInteractions: '✅ दवाओं के बीच कोई हानिकारक टकराव नहीं मिला। डॉक्टर के निर्देशानुसार सुरक्षित है।',
-    scheduleTitle: '📅 दैनिक दवा समय-सारणी',
-    slotMorning: '☀️ सुबह (Morning)',
-    slotAfternoon: '🌤️ दोपहर (Afternoon)',
-    slotNight: '🌙 रात (Night)',
-    medsListTitle: '💊 पहचानी गई दवाएं एवं आवश्यक निर्देश',
-    lblDosage: 'खुराक',
-    lblTiming: 'लेने का समय व भोजन निर्देश',
-    lblUses: 'दवा का उपयोग / उद्देश्य',
-    lblWarnings: 'सावधानी एवं चेतावनी',
-    btnDownloadPDF: '📥 मेडिकल कार्ड प्रिंट / सेव करें',
-    btnScanNew: '🔄 दूसरा पर्चा स्कैन करें',
-    btnSettings: '⚙️ API सेटिंग्स',
+    unspecified: 'उल्लेख नहीं',
+    summaryTitle: 'सरल सारांश',
+    btnListen: 'सुनें',
+    btnStopListen: 'बंद करें',
+    interactionsTitle: 'दवा टकराव की जांच',
+    noInteractions: 'पहचानी गई दवाओं के बीच कोई हानिकारक टकराव नहीं मिला।',
+    sevContraindicated: 'प्रतिबंधित संयोजन',
+    sevMajor: 'गंभीर',
+    sevModerate: 'मध्यम',
+    recommended: 'सुझाई गई कार्रवाई:',
+    scheduleTitle: 'दैनिक समय-सारणी',
+    slotMorning: 'सुबह',
+    slotAfternoon: 'दोपहर',
+    slotNight: 'रात',
+    slotEmpty: 'कोई नहीं',
+    medsListTitle: 'दवाएं और निर्देश',
+    lblDosage: 'खुराक का क्रम',
+    lblTiming: 'समय और भोजन',
+    lblDuration: 'अवधि',
+    lblUses: 'उपयोग',
+    lblWarnings: 'चेतावनी:',
+    notInDb: 'डेटाबेस में नहीं',
+    btnDownloadPDF: 'प्रिंट करें या PDF सहेजें',
+    btnScanNew: 'दूसरा पर्चा स्कैन करें',
+    sourceLive: 'Gemma 4',
+    sourceOffline: 'ऑफ़लाइन इंजन',
+    disclaimer: 'चिकित्सा अस्वीकरण: औषधि दृष्टि एक एआई सहायक है जो केवल शैक्षिक और सूचनात्मक उपयोग के लिए है। कोई भी दवा शुरू करने, बदलने या बंद करने से पहले डॉक्टर या फार्मासिस्ट से परामर्श करें।',
+
     settingsTitle: 'Gemma 4 API सेटिंग्स',
-    lblApiKey: 'API Key (Google AI Studio / Groq / OpenRouter)',
+    lblApiKey: 'API कुंजी',
     lblApiBase: 'API बेस URL',
     lblModel: 'मॉडल का नाम',
-    btnSaveConfig: 'सेटिंग्स सहेजें',
-    disclaimer: '⚕️ चिकित्सा अस्वीकरण: औषधि दृष्टि एक एआई सहायक प्रणाली है। किसी भी दवा को शुरू करने, बदलने या बंद करने से पहले डॉक्टर से परामर्श अवश्य लें।'
+    settingsHint: 'API कुंजी के बिना ऐप अपना ऑफ़लाइन इंजन चलाता है, जो तस्वीर पढ़ने के बजाय निश्चित डेमो डेटा लौटाता है।',
+    btnSaveConfig: 'सहेजें',
+    settingsSaved: 'सेटिंग्स सहेजी गईं।',
+    settingsFailed: 'सेटिंग्स सहेजी नहीं जा सकीं।',
+    keyConfigured: (k) => `कॉन्फ़िगर है (${k})`,
+    ttsUnsupported: 'इस ब्राउज़र में आवाज़ की सुविधा उपलब्ध नहीं है।'
   }
 };
 
-// DOM References
-const elements = {
-  dropzone: document.getElementById('dropzone'),
-  fileInput: document.getElementById('file-input'),
-  cameraInput: document.getElementById('camera-input'),
-  btnBrowse: document.getElementById('btn-browse'),
-  btnCamera: document.getElementById('btn-camera'),
-  loaderSection: document.getElementById('loader-section'),
-  resultsContainer: document.getElementById('results-container'),
-  inputGrid: document.getElementById('input-grid'),
-  presetsList: document.getElementById('presets-list'),
-  langEn: document.getElementById('lang-en'),
-  langHi: document.getElementById('lang-hi'),
-  btnThemeToggle: document.getElementById('btn-theme-toggle'),
-  btnSettingsOpen: document.getElementById('btn-settings-open'),
-  modalSettings: document.getElementById('modal-settings'),
-  btnSettingsClose: document.getElementById('btn-settings-close'),
-  formSettings: document.getElementById('form-settings'),
-  inputApiKey: document.getElementById('input-api-key'),
-  inputApiBase: document.getElementById('input-api-base'),
-  inputModel: document.getElementById('input-model'),
-  btnAudioSummary: document.getElementById('btn-audio-summary'),
-  btnScanNew: document.getElementById('btn-scan-new'),
-  btnPrintCard: document.getElementById('btn-print-card'),
-  imagePreview: document.getElementById('image-preview'),
-  // Dynamic fields
-  patientName: document.getElementById('patient-name'),
-  patientDoctor: document.getElementById('patient-doctor'),
-  patientDate: document.getElementById('patient-date'),
-  patientVitals: document.getElementById('patient-vitals'),
-  safetyBanner: document.getElementById('safety-banner'),
-  safetyIcon: document.getElementById('safety-icon'),
-  safetyTitle: document.getElementById('safety-title'),
-  safetyDesc: document.getElementById('safety-desc'),
-  summaryText: document.getElementById('summary-text'),
-  interactionsList: document.getElementById('interactions-list'),
-  scheduleMorning: document.getElementById('schedule-morning'),
-  scheduleAfternoon: document.getElementById('schedule-afternoon'),
-  scheduleNight: document.getElementById('schedule-night'),
-  medicationsCards: document.getElementById('medications-cards'),
-  sourceTag: document.getElementById('source-tag')
+const tr = (key, ...args) => {
+  const v = (I18N[state.lang] || I18N.en)[key] ?? I18N.en[key] ?? key;
+  return typeof v === 'function' ? v(...args) : v;
 };
 
-// Initialize Application
+/* --------------------------------------------------------------------------
+   Bootstrap
+   -------------------------------------------------------------------------- */
+const el = {};
+
 document.addEventListener('DOMContentLoaded', () => {
-  setupLanguage();
-  setupTheme();
-  setupEventListeners();
-  loadSamplePresets();
+  [
+    'dropzone', 'file-input', 'camera-input', 'btn-browse', 'btn-camera', 'presets-list',
+    'lang-en', 'lang-hi', 'btn-theme-toggle', 'btn-settings-open', 'btn-settings-close', 'modal-settings',
+    'form-settings', 'input-api-key', 'input-api-base', 'input-model', 'settings-status',
+    'view-input', 'view-progress', 'view-results',
+    'scan-frame', 'scan-image', 'scan-meta', 'scan-badge', 'stage-list', 'elapsed', 'progress-fill',
+    'progress-track', 'progress-label', 'progress-pct', 'progress-error', 'progress-error-text',
+    'btn-cancel', 'btn-error-back',
+    'image-preview', 'source-tag', 'patient-name', 'patient-vitals', 'patient-doctor', 'patient-date',
+    'safety-banner', 'safety-icon', 'safety-title', 'safety-desc', 'summary-text', 'btn-audio-summary',
+    'audio-icon', 'audio-label', 'interactions-list', 'schedule-morning', 'schedule-afternoon',
+    'schedule-night', 'count-morning', 'count-afternoon', 'count-night', 'medications-cards',
+    'btn-scan-new', 'btn-print-card'
+  ].forEach((id) => { el[id] = $(id); });
+
+  applyTheme();
+  setLanguage(state.lang);
+  bindEvents();
+  loadSamples();
   loadApiConfig();
 });
 
-// Setup Language Switcher
-function setupLanguage() {
-  setLanguage(state.currentLang);
-  elements.langEn.addEventListener('click', () => setLanguage('en'));
-  elements.langHi.addEventListener('click', () => setLanguage('hi'));
+function showView(name) {
+  state.view = name;
+  ['input', 'progress', 'results'].forEach((v) => { el['view-' + v].hidden = v !== name; });
+  window.scrollTo({ top: 0, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
 }
 
+/* --------------------------------------------------------------------------
+   Language and theme
+   -------------------------------------------------------------------------- */
 function setLanguage(lang) {
-  state.currentLang = lang;
+  state.lang = lang;
   localStorage.setItem('ad_lang', lang);
+  document.documentElement.lang = lang;
+  document.body.classList.toggle('lang-hi', lang === 'hi');
+  el['lang-en'].classList.toggle('active', lang === 'en');
+  el['lang-hi'].classList.toggle('active', lang === 'hi');
+  el['lang-en'].setAttribute('aria-pressed', String(lang === 'en'));
+  el['lang-hi'].setAttribute('aria-pressed', String(lang === 'hi'));
 
-  if (lang === 'hi') {
-    elements.langHi.classList.add('active');
-    elements.langEn.classList.remove('active');
-    document.body.classList.add('lang-hi');
-  } else {
-    elements.langEn.classList.add('active');
-    elements.langHi.classList.remove('active');
-    document.body.classList.remove('lang-hi');
-  }
-
-  // Update UI texts
-  const t = I18N[lang];
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    if (t[key]) {
-      el.innerHTML = t[key];
-    }
+  document.querySelectorAll('[data-i18n]').forEach((node) => {
+    const v = tr(node.getAttribute('data-i18n'));
+    if (typeof v === 'string') node.textContent = v;
   });
+  updateThemeLabel();
+  updateAudioButton();
+  setBadge(el['scan-badge'].dataset.kind || 'scanning');
 
-  // Re-render analysis if currently active
-  if (state.currentAnalysis) {
-    renderAnalysis(state.currentAnalysis);
+  if (state.samples.length) renderPresets();
+  if (state.run) {
+    refreshProgressText(state.run);
+    renderAllStages(state.run);
+    renderMeta(state.run);
   }
+  if (state.analysis) renderAnalysis(state.analysis, { animate: false });
 }
 
-// Setup Theme
-function setupTheme() {
-  if (state.currentTheme === 'light') {
-    document.body.classList.add('light-theme');
-    elements.btnThemeToggle.innerHTML = '🌙';
-  } else {
-    document.body.classList.remove('light-theme');
-    elements.btnThemeToggle.innerHTML = '☀️';
-  }
-
-  elements.btnThemeToggle.addEventListener('click', () => {
-    document.body.classList.toggle('light-theme');
-    const isLight = document.body.classList.contains('light-theme');
-    state.currentTheme = isLight ? 'light' : 'dark';
-    localStorage.setItem('ad_theme', state.currentTheme);
-    elements.btnThemeToggle.innerHTML = isLight ? '🌙' : '☀️';
-  });
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', state.theme === 'dark' ? 'dark' : 'light');
+  updateThemeLabel();
 }
 
-// Event Listeners
-function setupEventListeners() {
-  // Drag and drop
-  elements.dropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.add('drag-over');
-  });
-
-  elements.dropzone.addEventListener('dragleave', () => {
-    elements.dropzone.classList.remove('drag-over');
-  });
-
-  elements.dropzone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.remove('drag-over');
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload(e.dataTransfer.files[0]);
-    }
-  });
-
-  // Browse buttons
-  elements.btnBrowse.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.fileInput.click();
-  });
-
-  elements.dropzone.addEventListener('click', () => {
-    elements.fileInput.click();
-  });
-
-  elements.btnCamera.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.cameraInput.click();
-  });
-
-  elements.fileInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileUpload(e.target.files[0]);
-    }
-  });
-
-  elements.cameraInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileUpload(e.target.files[0]);
-    }
-  });
-
-  // Actions
-  elements.btnScanNew.addEventListener('click', resetToUpload);
-  elements.btnPrintCard.addEventListener('click', () => window.print());
-  elements.btnAudioSummary.addEventListener('click', toggleAudioSummary);
-
-  // Settings Modal
-  elements.btnSettingsOpen.addEventListener('click', () => {
-    elements.modalSettings.classList.add('active');
-  });
-
-  elements.btnSettingsClose.addEventListener('click', () => {
-    elements.modalSettings.classList.remove('active');
-  });
-
-  elements.modalSettings.addEventListener('click', (e) => {
-    if (e.target === elements.modalSettings) {
-      elements.modalSettings.classList.remove('active');
-    }
-  });
-
-  elements.formSettings.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const apiKey = elements.inputApiKey.value.trim();
-    const apiBase = elements.inputApiBase.value.trim();
-    const model = elements.inputModel.value.trim();
-
-    try {
-      const res = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey, api_base: apiBase, model: model })
-      });
-      const data = await res.json();
-      alert(state.currentLang === 'hi' ? 'सेटिंग्स सफलतापूर्वक सुरक्षित की गईं!' : 'Configuration updated successfully!');
-      elements.modalSettings.classList.remove('active');
-      loadApiConfig();
-    } catch (err) {
-      alert('Failed to save settings: ' + err);
-    }
-  });
+function updateThemeLabel() {
+  if (el['btn-theme-toggle']) el['btn-theme-toggle'].textContent = tr(state.theme === 'dark' ? 'themeLight' : 'themeDark');
 }
 
-// Fetch Sample Presets
-async function loadSamplePresets() {
+/* --------------------------------------------------------------------------
+   Events
+   -------------------------------------------------------------------------- */
+function bindEvents() {
+  el['lang-en'].addEventListener('click', () => setLanguage('en'));
+  el['lang-hi'].addEventListener('click', () => setLanguage('hi'));
+  el['btn-theme-toggle'].addEventListener('click', () => {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('ad_theme_v2', state.theme);
+    applyTheme();
+  });
+
+  const dz = el.dropzone;
+  dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  dz.addEventListener('click', () => el['file-input'].click());
+  dz.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el['file-input'].click(); }
+  });
+  el['btn-browse'].addEventListener('click', (e) => { e.stopPropagation(); el['file-input'].click(); });
+  el['btn-camera'].addEventListener('click', (e) => { e.stopPropagation(); el['camera-input'].click(); });
+  [el['file-input'], el['camera-input']].forEach((inp) => {
+    inp.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) handleFile(f);
+      e.target.value = '';
+    });
+  });
+
+  el['btn-scan-new'].addEventListener('click', resetToUpload);
+  el['btn-print-card'].addEventListener('click', () => window.print());
+  el['btn-audio-summary'].addEventListener('click', toggleAudio);
+  el['btn-cancel'].addEventListener('click', resetToUpload);
+  el['btn-error-back'].addEventListener('click', resetToUpload);
+
+  el['btn-settings-open'].addEventListener('click', () => { el['settings-status'].textContent = ''; el['modal-settings'].classList.add('active'); el['input-api-key'].focus(); });
+  el['btn-settings-close'].addEventListener('click', closeSettings);
+  el['modal-settings'].addEventListener('click', (e) => { if (e.target === el['modal-settings']) closeSettings(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+  el['form-settings'].addEventListener('submit', saveSettings);
+}
+
+function closeSettings() { el['modal-settings'].classList.remove('active'); }
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const status = el['settings-status'];
+  status.className = 'form-status';
+  const body = {
+    api_base: el['input-api-base'].value.trim(),
+    model: el['input-model'].value.trim()
+  };
+  const key = el['input-api-key'].value.trim();
+  if (key) body.api_key = key; // leave the stored key untouched when the field is blank
   try {
-    const res = await fetch('/api/samples');
-    const samples = await res.json();
-    renderPresetsList(samples);
-  } catch (err) {
-    console.error('Failed to load sample presets:', err);
+    const res = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(String(res.status));
+    el['input-api-key'].value = '';
+    status.textContent = tr('settingsSaved');
+    loadApiConfig();
+  } catch {
+    status.className = 'form-status error';
+    status.textContent = tr('settingsFailed');
   }
 }
 
-function renderPresetsList(samples) {
-  elements.presetsList.innerHTML = '';
-  const isHi = state.currentLang === 'hi';
-
-  samples.forEach(s => {
-    const item = document.createElement('div');
-    item.className = 'preset-item';
-    
-    let tagClass = 'tag-safe';
-    if (s.id === 'arthritis_pain') tagClass = 'tag-danger';
-    else if (s.id === 'infection_fever') tagClass = 'tag-acute';
-
-    item.innerHTML = `
-      <div class="preset-item-top">
-        <span class="preset-title">${isHi ? s.title_hi : s.title_en}</span>
-        <span class="preset-tag ${tagClass}">${s.tag}</span>
-      </div>
-      <div class="preset-desc">${isHi ? s.subtitle_hi : s.subtitle_en}</div>
-    `;
-
-    item.addEventListener('click', () => handleSampleSelect(s.id));
-    elements.presetsList.appendChild(item);
-  });
-}
-
-// Fetch Current API Config
 async function loadApiConfig() {
   try {
-    const res = await fetch('/api/config');
-    const cfg = await res.json();
-    state.apiConfig = cfg;
-    elements.inputApiBase.value = cfg.api_base;
-    elements.inputModel.value = cfg.model;
-    if (cfg.api_key_set) {
-      elements.inputApiKey.placeholder = `Configured (${cfg.masked_key})`;
-    }
+    const cfg = await (await fetch('/api/config')).json();
+    el['input-api-base'].value = cfg.api_base;
+    el['input-model'].value = cfg.model;
+    el['input-api-key'].placeholder = cfg.api_key_set ? tr('keyConfigured', cfg.masked_key) : 'Paste your API key';
   } catch (err) {
     console.error('Failed to load config:', err);
   }
 }
 
-// Handle File Upload
-async function handleFileUpload(file) {
-  if (state.isAnalyzing) return;
-  startAnalysisAnimation();
-
-  const formData = new FormData();
-  formData.append('file', file);
-
+/* --------------------------------------------------------------------------
+   Sample prescriptions
+   -------------------------------------------------------------------------- */
+async function loadSamples() {
   try {
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      body: formData
-    });
+    state.samples = await (await fetch('/api/samples')).json();
+    renderPresets();
+  } catch (err) {
+    console.error('Failed to load samples:', err);
+  }
+}
 
+function renderPresets() {
+  const hi = state.lang === 'hi';
+  const tagFor = { cardio_diabetic: ['badge-safe', 'tagSafe'], infection_fever: ['badge-accent', 'tagAcute'], arthritis_pain: ['badge-danger', 'tagDanger'] };
+  el['presets-list'].innerHTML = '';
+  state.samples.forEach((s) => {
+    const [cls, key] = tagFor[s.id] || ['', 'tagAcute'];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'preset-item';
+    btn.innerHTML = `
+      <span class="preset-top">
+        <span class="preset-title">${esc(hi ? s.title_hi : s.title_en)}</span>
+        <span class="badge ${cls}">${esc(tr(key))}</span>
+      </span>
+      <span class="preset-desc">${esc(hi ? s.subtitle_hi : s.subtitle_en)}</span>`;
+    btn.addEventListener('click', () => handleSample(s));
+    el['presets-list'].appendChild(btn);
+  });
+}
+
+/* --------------------------------------------------------------------------
+   Analysis run: request, stream, progress
+   -------------------------------------------------------------------------- */
+function handleFile(file) {
+  if (state.run) return;
+  const url = URL.createObjectURL(file);
+  const run = beginRun({ name: file.name, size: file.size, type: file.type || '-', previewUrl: url });
+  if (!file.type.startsWith('image/')) { fail(run, tr('errNotImage')); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  startStream(run, '/api/analyze/stream', { method: 'POST', body: fd });
+}
+
+function handleSample(sample) {
+  if (state.run) return;
+  const run = beginRun({ name: `${sample.id}.jpg`, size: null, type: 'image/jpeg', previewUrl: sample.preview_url });
+  startStream(run, `/api/analyze-sample/${encodeURIComponent(sample.id)}/stream`, { method: 'POST' });
+}
+
+function beginRun({ name, size, type, previewUrl }) {
+  const run = {
+    id: ++runSeq,
+    ctrl: new AbortController(),
+    startedAt: performance.now(),
+    stages: {},
+    queue: [],
+    pumping: false,
+    streamEnded: false,
+    failed: false,
+    finished: false,
+    result: null,
+    pct: 0,
+    meta: { name, size, type },
+    objectUrl: previewUrl && previewUrl.startsWith('blob:') ? previewUrl : null
+  };
+  STAGES.forEach((s) => { run.stages[s.id] = { status: 'pending', data: null, t0: null, t1: null, body: '' }; });
+  state.run = run;
+
+  showView('progress');
+  el['scan-meta'].innerHTML = '';
+  el['progress-error'].hidden = true;
+  el['progress-fill'].className = 'progress-fill';
+  el['progress-fill'].style.width = '0%';
+  el['scan-frame'].classList.add('is-scanning');
+  setBadge('scanning');
+  buildStageList(run);
+  renderMeta(run);
+
+  const img = el['scan-image'];
+  img.hidden = true;
+  img.onload = () => {
+    img.hidden = false;
+    if (!run.meta.original || run.stages.enhance.status === 'pending') {
+      run.meta.original = `${img.naturalWidth} x ${img.naturalHeight}`;
+      if (state.run === run) renderMeta(run);
+    }
+  };
+  img.onerror = () => { img.hidden = true; };
+  img.src = previewUrl;
+
+  setStage(run, 'upload', 'active');
+  run.timer = setInterval(() => tickRun(run), 100);
+  tickRun(run);
+  return run;
+}
+
+async function startStream(run, url, init) {
+  try {
+    const res = await fetch(url, { ...init, signal: run.ctrl.signal });
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || 'Analysis failed');
+      let detail = '';
+      try { detail = (await res.json()).detail || ''; } catch { /* ignore */ }
+      throw new Error(detail || `HTTP ${res.status}`);
     }
-
-    const data = await res.json();
-    displayResults(data);
+    await readNdjson(run, res);
+    run.streamEnded = true;
+    pump(run);
   } catch (err) {
-    alert('Error analyzing prescription: ' + err.message);
-    resetToUpload();
+    if (run.ctrl.signal.aborted || state.run !== run) return;
+    const network = err instanceof TypeError;
+    fail(run, network ? tr('errNetwork') : err.message);
   }
 }
 
-// Handle Sample Preset Select
-async function handleSampleSelect(presetId) {
-  if (state.isAnalyzing) return;
-  startAnalysisAnimation();
-
-  try {
-    const res = await fetch(`/api/analyze-sample/${presetId}`, {
-      method: 'POST'
-    });
-
-    if (!res.ok) throw new Error('Failed to analyze sample preset');
-
-    const data = await res.json();
-    displayResults(data);
-  } catch (err) {
-    alert('Error: ' + err.message);
-    resetToUpload();
-  }
-}
-
-// Loading Animation
-function startAnalysisAnimation() {
-  state.isAnalyzing = true;
-  elements.inputGrid.style.display = 'none';
-  elements.resultsContainer.style.display = 'none';
-  elements.loaderSection.style.display = 'block';
-
-  // Step sequencer animation
-  const steps = [
-    document.getElementById('step-1'),
-    document.getElementById('step-2'),
-    document.getElementById('step-3'),
-    document.getElementById('step-4')
-  ];
-
-  steps.forEach(s => s.className = 'loader-step-pill');
-  if (steps[0]) steps[0].classList.add('active');
-
-  setTimeout(() => {
-    if (steps[0]) steps[0].classList.replace('active', 'done');
-    if (steps[1]) steps[1].classList.add('active');
-  }, 700);
-
-  setTimeout(() => {
-    if (steps[1]) steps[1].classList.replace('active', 'done');
-    if (steps[2]) steps[2].classList.add('active');
-  }, 1400);
-
-  setTimeout(() => {
-    if (steps[2]) steps[2].classList.replace('active', 'done');
-    if (steps[3]) steps[3].classList.add('active');
-  }, 2000);
-}
-
-// Display Results
-function displayResults(data) {
-  state.isAnalyzing = false;
-  state.currentAnalysis = data;
-
-  elements.loaderSection.style.display = 'none';
-  elements.resultsContainer.style.display = 'grid';
-
-  // Set image preview
-  if (data.image_data_url) {
-    elements.imagePreview.src = data.image_data_url;
-  }
-
-  renderAnalysis(data);
-
-  // Smooth scroll into view
-  elements.resultsContainer.scrollIntoView({ behavior: 'smooth' });
-}
-
-// Render Content based on current language
-function renderAnalysis(data) {
-  const isHi = state.currentLang === 'hi';
-  const analysis = data.analysis;
-  const p = analysis.patient || {};
-
-  // Patient Info
-  elements.patientName.textContent = p.name || (isHi ? 'पहचाना नहीं गया' : 'Unspecified');
-  elements.patientDoctor.textContent = p.doctor || (isHi ? 'अस्पताल / ओपीडी' : 'Hospital / OPD');
-  elements.patientDate.textContent = p.date || (isHi ? 'आज' : 'Today');
-  elements.patientVitals.textContent = p.age_gender || 'N/A';
-
-  // Source Engine Tag
-  if (elements.sourceTag) {
-    elements.sourceTag.textContent = analysis.source || 'Gemma 4';
-  }
-
-  // Safety Banner
-  const safety = analysis.safety || { level: 'safe' };
-  elements.safetyBanner.className = `safety-banner ${safety.level}`;
-  
-  if (safety.level === 'danger') {
-    elements.safetyIcon.textContent = '🚫';
-  } else if (safety.level === 'caution') {
-    elements.safetyIcon.textContent = '⚠️';
-  } else {
-    elements.safetyIcon.textContent = '✅';
-  }
-
-  elements.safetyTitle.textContent = isHi ? safety.badge_hi : safety.badge_en;
-  elements.safetyDesc.textContent = isHi ? safety.summary_hi : safety.summary_en;
-
-  // Summary Text
-  elements.summaryText.textContent = isHi ? analysis.summary_hi : analysis.summary_en;
-
-  // Drug-Drug Interactions
-  renderInteractions(analysis.interactions || [], isHi);
-
-  // Daily Schedule
-  renderSchedule(analysis.medications || [], isHi);
-
-  // Detailed Medication Cards
-  renderMedicationCards(analysis.medications || [], isHi);
-}
-
-// Render Drug Interactions
-function renderInteractions(interactions, isHi) {
-  elements.interactionsList.innerHTML = '';
-  
-  if (interactions.length === 0) {
-    elements.interactionsList.innerHTML = `
-      <div class="interaction-item" style="border-left-color: #16a34a; background: rgba(22, 163, 74, 0.08);">
-        <p style="color: #4ade80; font-weight: 600;">${isHi ? I18N.hi.noInteractions : I18N.en.noInteractions}</p>
-      </div>
-    `;
+async function readNdjson(run, res) {
+  const parse = (line) => { try { return JSON.parse(line); } catch { return null; } };
+  const push = (line) => { const ev = line.trim() && parse(line); if (ev) { run.queue.push(ev); pump(run); } };
+  if (!res.body || !res.body.getReader) {
+    (await res.text()).split('\n').forEach(push);
     return;
   }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) { push(buf.slice(0, i)); buf = buf.slice(i + 1); }
+  }
+  push(buf);
+}
 
-  interactions.forEach(ix => {
-    const div = document.createElement('div');
-    div.className = `interaction-item ${ix.severity}`;
-    
-    const drugsBadge = (ix.drugs || []).map(d => d.toUpperCase()).join(' + ');
-    const title = isHi ? ix.title_hi : ix.title_en;
-    const desc = isHi ? ix.description_hi : ix.description_en;
-    const action = isHi ? ix.action_hi : ix.action_en;
+/* Events are applied one at a time with a short dwell so fast stages stay readable. */
+async function pump(run) {
+  if (run.pumping) return;
+  run.pumping = true;
+  while (run.queue.length && state.run === run && !run.failed) {
+    const ev = run.queue.shift();
+    if (ev.type === 'stage') {
+      setStage(run, ev.id, ev.status, ev.data);
+      if (!REDUCED_MOTION) {
+        if (ev.status === 'active' && ev.id !== 'vision') await sleep(220);
+        else if (ev.status === 'done') await sleep(ev.id === 'vision' ? 900 : 380);
+      }
+    } else if (ev.type === 'result') {
+      run.result = ev.payload;
+    } else if (ev.type === 'error') {
+      fail(run, ev.message);
+    }
+    /* 'tick' heartbeats keep the connection alive; elapsed time is drawn from the local clock. */
+  }
+  run.pumping = false;
+  if (run.streamEnded && !run.queue.length) finish(run);
+}
 
-    div.innerHTML = `
-      <div class="interaction-item-head">
-        <span class="interaction-title">${title}</span>
-        <span class="interaction-drugs-badge">${drugsBadge}</span>
+async function finish(run) {
+  if (state.run !== run || run.failed || run.finished) return;
+  run.finished = true;
+  if (!run.result) { fail(run, tr('errNoResult')); return; }
+  clearInterval(run.timer);
+  setProgress(run, 100);
+  el['progress-fill'].classList.add('is-done');
+  el['progress-label'].textContent = tr('allDone');
+  el['scan-frame'].classList.remove('is-scanning');
+  setBadge('done');
+  await sleep(REDUCED_MOTION ? 0 : 450);
+  if (state.run !== run) return;
+  if (run.objectUrl) URL.revokeObjectURL(run.objectUrl);
+  state.run = null;
+  state.analysis = run.result;
+  el['image-preview'].src = run.result.image_data_url || '';
+  showView('results');
+  renderAnalysis(run.result, { animate: true });
+}
+
+function fail(run, message) {
+  if (state.run !== run || run.failed) return;
+  run.failed = true;
+  run.ctrl.abort();
+  clearInterval(run.timer);
+  const active = STAGES.find((s) => run.stages[s.id].status === 'active') || STAGES.find((s) => run.stages[s.id].status === 'pending');
+  if (active) { run.stages[active.id].status = 'error'; renderStage(run, active.id); }
+  el['progress-fill'].classList.add('is-error');
+  el['scan-frame'].classList.remove('is-scanning');
+  setBadge('failed');
+  el['progress-label'].textContent = active ? tr('failedAt', tr('stage_' + active.id)) : '';
+  el['progress-error-text'].textContent = message;
+  el['progress-error'].hidden = false;
+}
+
+function setBadge(kind) {
+  const b = el['scan-badge'];
+  b.className = 'badge ' + (kind === 'done' ? 'badge-safe' : kind === 'failed' ? 'badge-danger' : 'badge-neutral');
+  b.textContent = tr(kind === 'done' ? 'badgeDone' : kind === 'failed' ? 'badgeFailed' : 'badgeScanning');
+  b.dataset.kind = kind;
+}
+
+/* ---- Progress bar and clock ---- */
+function tickRun(run) {
+  if (state.run !== run) return;
+  const now = performance.now();
+  el.elapsed.textContent = tr('elapsedLabel', ((now - run.startedAt) / 1000).toFixed(1));
+
+  let pct = 0;
+  STAGES.forEach((s) => {
+    const st = run.stages[s.id];
+    if (st.status === 'done' || st.status === 'warn') pct += s.weight;
+    else if (st.status === 'active') {
+      const secs = (now - st.t0) / 1000;
+      // The model call has no measurable progress, so ease toward (never reach) the end of its share.
+      const frac = s.id === 'vision' ? 0.92 * (1 - Math.exp(-secs / 9)) : 0.5;
+      pct += s.weight * frac;
+    }
+  });
+  setProgress(run, pct);
+  if (run.stages.vision.status === 'active') updateVisionDetail(run);
+}
+
+function setProgress(run, pct) {
+  run.pct = Math.max(run.pct, Math.min(100, pct));
+  const v = Math.round(run.pct);
+  el['progress-fill'].style.width = run.pct.toFixed(1) + '%';
+  el['progress-pct'].textContent = v + '%';
+  el['progress-track'].setAttribute('aria-valuenow', String(v));
+  refreshProgressText(run);
+}
+
+function refreshProgressText(run) {
+  if (run.failed || run.finished) return;
+  const idx = STAGES.findIndex((s) => run.stages[s.id].status === 'active');
+  if (idx >= 0) el['progress-label'].textContent = tr('stepOf', idx + 1, STAGES.length, tr('stage_' + STAGES[idx].id));
+}
+
+/* ---- Stage list ---- */
+function buildStageList(run) {
+  el['stage-list'].innerHTML = STAGES.map((s) => `
+    <li class="stage is-pending" id="stage-${s.id}">
+      <span class="stage-marker" id="marker-${s.id}"></span>
+      <div class="stage-main">
+        <div class="stage-head"><span class="stage-title" id="title-${s.id}"></span><span class="stage-time" id="time-${s.id}"></span></div>
+        <p class="stage-detail" id="detail-${s.id}"></p>
+        <div class="stage-body" id="bodywrap-${s.id}"><div><div class="stage-data" id="body-${s.id}"></div></div></div>
       </div>
-      <div class="interaction-desc">${desc}</div>
-      <div class="interaction-action">👉 ${action}</div>
-    `;
-    elements.interactionsList.appendChild(div);
+    </li>`).join('');
+  renderAllStages(run);
+}
+
+function setStage(run, id, status, data) {
+  const st = run.stages[id];
+  if (!st) return;
+  if (status === 'active' && st.t0 == null) st.t0 = performance.now();
+  if (status === 'done') {
+    if (st.t0 == null) st.t0 = run.startedAt;
+    st.t1 = performance.now();
+    // A finished stage that fell back to the offline engine is flagged rather than shown as a clean success.
+    if (id === 'vision' && data && data.engine === 'offline') status = 'warn';
+  }
+  st.status = status;
+  if (data) {
+    st.data = data;
+    if (id === 'enhance') {
+      run.meta.original = `${data.original_width} x ${data.original_height}`;
+      run.meta.enhanced = `${data.processed_width} x ${data.processed_height}`;
+      if (data.image_data_url) { el['scan-image'].src = data.image_data_url; el['scan-image'].hidden = false; }
+    }
+    if (id === 'upload' && data.size_bytes != null) run.meta.size = data.size_bytes;
+    if (id === 'vision' && data.model) run.meta.model = data.model;
+    renderMeta(run);
+  }
+  renderStage(run, id);
+  tickRun(run);
+}
+
+function renderAllStages(run) { STAGES.forEach((s) => renderStage(run, s.id)); }
+
+const ICON_TICK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="tick" d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
+const ICON_BANG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v8M12 18v.01" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
+
+function renderStage(run, id) {
+  const st = run.stages[id];
+  const li = $('stage-' + id);
+  if (!li) return;
+  li.className = 'stage is-' + st.status;
+  $('marker-' + id).innerHTML = st.status === 'done' ? ICON_TICK : st.status === 'error' ? ICON_X : st.status === 'warn' ? ICON_BANG : '';
+  $('title-' + id).textContent = tr('stage_' + id);
+  $('time-' + id).textContent = st.t1 != null && st.t0 != null ? ((st.t1 - st.t0) / 1000).toFixed(1) + ' s' : '';
+
+  $('detail-' + id).textContent = stageDetail(run, id, st);
+
+  const html = stageBody(id, st);
+  if (html !== st.body) {
+    st.body = html;
+    $('body-' + id).innerHTML = html;
+  }
+  $('bodywrap-' + id).classList.toggle('open', !!html);
+}
+
+function updateVisionDetail(run) {
+  const st = run.stages.vision;
+  if (st.status === 'active') $('detail-vision').textContent = stageDetail(run, 'vision', st);
+}
+
+const fmtBytes = (b) => (b == null ? '-' : b < 1024 * 1024 ? (b / 1024).toFixed(0) + ' KB' : (b / 1024 / 1024).toFixed(2) + ' MB');
+
+function stageDetail(run, id, st) {
+  const d = st.data || {};
+  if (st.status === 'pending') return '';
+  switch (id) {
+    case 'upload':
+      return st.status === 'done' ? tr('upload_done', fmtBytes(d.size_bytes)) : '';
+    case 'enhance':
+      if (st.status === 'active') return tr('enhance_active');
+      return d.original_width ? tr('enhance_done', d.original_width, d.original_height, d.processed_width, d.processed_height) : '';
+    case 'vision': {
+      if (st.status === 'active') {
+        const secs = (performance.now() - st.t0) / 1000;
+        if (!d.engine) return '';
+        if (d.engine === 'offline') return tr('vision_active_offline');
+        return secs > 25 ? tr('vision_slow') : tr('vision_active_live', d.model, d.host, secs.toFixed(0));
+      }
+      const n = (d.medications || []).length;
+      return d.engine === 'offline' ? tr('vision_done_offline', n, d.fallback_reason || '-') : tr('vision_done_live', n, d.elapsed);
+    }
+    case 'screening':
+      if (st.status === 'active') return tr('screening_active');
+      return d.pairs_checked != null ? tr('screening_done', d.medications_matched, d.medications_total, d.pairs_checked, d.rules_total) : '';
+    case 'report':
+      return st.status === 'active' ? tr('report_active') : st.status === 'done' ? tr('report_done') : '';
+    default:
+      return '';
+  }
+}
+
+function kv(label, value) { return `<span>${esc(label)} <b>${esc(value)}</b></span>`; }
+
+function stageBody(id, st) {
+  const d = st.data || {};
+  if (st.status === 'pending' || st.status === 'error') return '';
+  if (id === 'enhance' && st.status === 'done') {
+    return `<div class="kv-row">${kv(tr('kvContrast'), '1.4x')}${kv(tr('kvSharpness'), '1.3x')}${kv(tr('kvOutput'), fmtBytes(d.processed_size_bytes))}</div>`;
+  }
+  if (id === 'vision') {
+    if (st.status === 'active' && d.engine === 'live') {
+      return `<div class="kv-row">${kv(tr('kvModel'), d.model)}${kv(tr('kvEndpoint'), d.host)}</div>`;
+    }
+    if (st.status === 'done' || st.status === 'warn') {
+      const chips = (d.medications || []).map((m, i) => `
+        <div class="chip" style="animation-delay:${i * 90}ms"><strong>${esc(m.name)}</strong><span>${esc([m.dosage, m.frequency].filter(Boolean).join('  '))}</span></div>`).join('');
+      const patient = d.patient_name && d.engine === 'live' ? `<div class="kv-row">${kv(tr('kvPatient'), d.patient_name)}</div>` : '';
+      return `<div class="chip-row">${chips}</div>${patient}`;
+    }
+  }
+  if (id === 'screening' && st.status === 'done') {
+    const parts = [];
+    if (d.contraindicated) parts.push(kv(tr('sevContraindicated'), d.contraindicated));
+    if (d.major) parts.push(kv(tr('sevMajor'), d.major));
+    if (d.moderate) parts.push(kv(tr('sevModerate'), d.moderate));
+    return `<div class="kv-row">${d.alerts ? kv(tr('kvFound'), d.alerts) + parts.join('') : `<span><b>${esc(tr('kvNone'))}</b></span>`}</div>`;
+  }
+  return '';
+}
+
+/* ---- Document meta list ---- */
+const META_ORDER = ['name', 'size', 'type', 'original', 'enhanced', 'model'];
+
+function renderMeta(run) {
+  const m = run.meta;
+  const values = { name: m.name, size: m.size != null ? fmtBytes(m.size) : null, type: m.type, original: m.original, enhanced: m.enhanced, model: m.model };
+  const list = el['scan-meta'];
+  // Rows are updated in place and inserted in order, so rows already on screen never re-animate.
+  META_ORDER.forEach((k, idx) => {
+    if (!values[k]) return;
+    let row = list.querySelector(`[data-k="${k}"]`);
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'meta-row';
+      row.dataset.k = k;
+      row.innerHTML = '<dt></dt><dd></dd>';
+      const next = Array.from(list.children).find((c) => META_ORDER.indexOf(c.dataset.k) > idx);
+      list.insertBefore(row, next || null);
+    }
+    row.firstChild.textContent = tr('meta_' + k);
+    row.lastChild.textContent = values[k];
   });
 }
 
-// Render Daily Timetable
-function renderSchedule(meds, isHi) {
-  elements.scheduleMorning.innerHTML = '';
-  elements.scheduleAfternoon.innerHTML = '';
-  elements.scheduleNight.innerHTML = '';
+/* --------------------------------------------------------------------------
+   Results
+   -------------------------------------------------------------------------- */
+function renderAnalysis(data, { animate }) {
+  const hi = state.lang === 'hi';
+  const a = data.analysis;
+  const p = a.patient || {};
+  const view = el['view-results'];
+  view.classList.toggle('no-anim', !animate);
 
-  let mCount = 0, aCount = 0, nCount = 0;
+  el['patient-name'].textContent = p.name || tr('unspecified');
+  el['patient-vitals'].textContent = p.age_gender || tr('unspecified');
+  el['patient-doctor'].textContent = p.doctor || tr('unspecified');
+  el['patient-date'].textContent = p.date || tr('unspecified');
 
-  meds.forEach(m => {
-    const freq = m.frequency || '';
-    const timing = isHi ? m.timing_hi : m.timing_en;
-    const name = m.generic_name || m.raw_name;
+  const offline = /offline/i.test(a.source || '');
+  el['source-tag'].className = 'badge ' + (offline ? 'badge-caution' : 'badge-accent');
+  el['source-tag'].textContent = tr(offline ? 'sourceOffline' : 'sourceLive');
 
-    // Morning check (1-x-x or 'morning' or 'breakfast')
-    if (freq.startsWith('1') || freq.includes('Morning') || freq.includes('Twice') || freq.includes('Thrice') || freq.includes('सुबह')) {
-      elements.scheduleMorning.appendChild(createSlotItem(name, m.dosage, timing));
-      mCount++;
-    }
+  const safety = a.safety || { level: 'safe' };
+  el['safety-banner'].className = `safety-banner ${safety.level}`;
+  const iconId = safety.level === 'danger' ? 'i-octagon' : safety.level === 'safe' ? 'i-check-circle' : 'i-alert';
+  el['safety-icon'].innerHTML = `<use href="#${iconId}"/>`;
+  el['safety-title'].textContent = sentenceCase(hi ? safety.badge_hi : safety.badge_en, hi);
+  el['safety-desc'].textContent = hi ? safety.summary_hi : safety.summary_en;
 
-    // Afternoon check (x-1-x or 'afternoon' or 'lunch')
-    if (freq.includes('-1-') || freq.includes('Thrice') || freq.includes('Afternoon') || freq.includes('Lunch') || freq.includes('दोपहर')) {
-      elements.scheduleAfternoon.appendChild(createSlotItem(name, m.dosage, timing));
-      aCount++;
-    }
+  el['summary-text'].textContent = hi ? a.summary_hi : a.summary_en;
 
-    // Night check (x-x-1 or 'night' or 'bedtime')
-    if (freq.endsWith('1') || freq.includes('Night') || freq.includes('Bedtime') || freq.includes('रात') || freq.includes('Twice')) {
-      elements.scheduleNight.appendChild(createSlotItem(name, m.dosage, timing));
-      nCount++;
-    }
+  renderInteractions(a.interactions || [], hi);
+  renderSchedule(a.medications || [], hi);
+  renderMedicationCards(a.medications || [], hi);
+
+  view.querySelectorAll('.reveal').forEach((n, i) => n.style.setProperty('--i', i + 1));
+  view.querySelectorAll('.med-card').forEach((n, i) => n.style.setProperty('--i', i));
+}
+
+const sentenceCase = (s, hi) => {
+  if (hi || !s) return s || '';
+  const l = s.toLowerCase();
+  return l.charAt(0).toUpperCase() + l.slice(1);
+};
+
+function renderInteractions(list, hi) {
+  const box = el['interactions-list'];
+  if (!list.length) {
+    box.innerHTML = `<div class="interaction none">${esc(tr('noInteractions'))}</div>`;
+    return;
+  }
+  const sev = { contraindicated: 'sevContraindicated', major: 'sevMajor', moderate: 'sevModerate' };
+  box.innerHTML = list.map((ix, i) => `
+    <div class="interaction ${esc(ix.severity)}" style="--i:${i}">
+      <div class="interaction-head">
+        <span class="interaction-title">${esc(hi ? ix.title_hi : ix.title_en)}</span>
+        <span class="interaction-sev">${esc(tr(sev[ix.severity] || 'sevModerate'))}</span>
+      </div>
+      <div class="interaction-drugs">${esc((ix.drugs || []).join(' + ').toUpperCase())}</div>
+      <p class="interaction-desc">${esc(hi ? ix.description_hi : ix.description_en)}</p>
+      <p class="interaction-action"><span>${esc(tr('recommended'))}</span> ${esc(hi ? ix.action_hi : ix.action_en)}</p>
+    </div>`).join('');
+}
+
+/* Reads "1-0-1" style schedules first, then falls back to common abbreviations and words. */
+function slotsFor(freq) {
+  const f = String(freq || '');
+  const pat = f.match(/(\d)\s*-\s*(\d)\s*-\s*(\d)/);
+  if (pat) return { morning: +pat[1] > 0, afternoon: +pat[2] > 0, night: +pat[3] > 0 };
+  const l = f.toLowerCase();
+  const s = { morning: false, afternoon: false, night: false };
+  if (/\b(tds|tid|thrice|three times)\b/.test(l)) return { morning: true, afternoon: true, night: true };
+  if (/\b(bd|bid|twice|two times)\b/.test(l)) return { morning: true, afternoon: false, night: true };
+  if (/morning|breakfast|\bod\b|once|सुबह/.test(l)) s.morning = true;
+  if (/afternoon|lunch|दोपहर/.test(l)) s.afternoon = true;
+  if (/night|bed|dinner|\bhs\b|रात/.test(l)) s.night = true;
+  if (!s.morning && !s.afternoon && !s.night) s.morning = true;
+  return s;
+}
+
+function renderSchedule(meds, hi) {
+  const slots = { morning: [], afternoon: [], night: [] };
+  meds.forEach((m) => {
+    const s = slotsFor(m.frequency);
+    const item = { name: m.generic_name || m.raw_name, dose: m.dosage, timing: hi ? m.timing_hi : m.timing_en };
+    Object.keys(slots).forEach((k) => { if (s[k]) slots[k].push(item); });
   });
-
-  if (mCount === 0) elements.scheduleMorning.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-dim);">${isHi ? 'कोई दवा नहीं' : 'No morning meds'}</span>`;
-  if (aCount === 0) elements.scheduleAfternoon.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-dim);">${isHi ? 'कोई दवा नहीं' : 'No afternoon meds'}</span>`;
-  if (nCount === 0) elements.scheduleNight.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-dim);">${isHi ? 'कोई दवा नहीं' : 'No night meds'}</span>`;
-}
-
-function createSlotItem(name, dosage, timing) {
-  const d = document.createElement('div');
-  d.className = 'slot-item';
-  d.innerHTML = `
-    <div class="slot-med-name">${name} <span style="font-size: 0.74rem; color: #38bdf8;">(${dosage})</span></div>
-    <div class="slot-med-timing">${timing}</div>
-  `;
-  return d;
-}
-
-// Render Detailed Medication Cards
-function renderMedicationCards(meds, isHi) {
-  elements.medicationsCards.innerHTML = '';
-
-  meds.forEach(m => {
-    const card = document.createElement('div');
-    card.className = 'med-card';
-
-    const category = isHi ? m.category_hi : m.category_en;
-    const timing = isHi ? m.timing_hi : m.timing_en;
-    const uses = isHi ? m.uses_hi : m.uses_en;
-    const warnings = isHi ? m.warnings_hi : m.warnings_en;
-    const frequency = isHi ? m.frequency_hi : m.frequency;
-
-    card.innerHTML = `
-      <div class="med-card-header">
-        <div class="med-name-group">
-          <h4>${m.generic_name || m.raw_name}</h4>
-          <span class="med-category">${category}</span>
-        </div>
-        <span class="med-dosage-pill">${m.dosage || 'Prescribed'}</span>
-      </div>
-      
-      <div class="med-details-grid">
-        <div class="detail-block">
-          <label>${isHi ? 'दैनिक खुराक (Schedule)' : 'Daily Schedule'}</label>
-          <p>${frequency}</p>
-        </div>
-        <div class="detail-block">
-          <label>${isHi ? 'लेने का समय (Timing)' : 'Timing & Food'}</label>
-          <p>${timing}</p>
-        </div>
-        <div class="detail-block" style="grid-column: 1 / -1;">
-          <label>${isHi ? 'उपयोग / लाभ (Purpose)' : 'Clinical Indications'}</label>
-          <p>${uses}</p>
-        </div>
-      </div>
-
-      <div class="med-warning-strip">
-        <strong>⚠️ ${isHi ? 'सावधानी:' : 'Warning:'}</strong> ${warnings}
-      </div>
-    `;
-
-    elements.medicationsCards.appendChild(card);
+  Object.entries(slots).forEach(([k, items]) => {
+    el['schedule-' + k].innerHTML = items.length
+      ? items.map((it) => `<div class="slot-item"><div class="slot-name">${esc(it.name)}<small>${esc(it.dose)}</small></div><div class="slot-timing">${esc(it.timing)}</div></div>`).join('')
+      : `<p class="slot-empty">${esc(tr('slotEmpty'))}</p>`;
+    el['count-' + k].textContent = items.length || '';
   });
 }
 
-// Audio Read Aloud (Web Speech API)
-function toggleAudioSummary() {
-  if (state.activeSpeech) {
-    window.speechSynthesis.cancel();
-    state.activeSpeech = null;
-    elements.btnAudioSummary.innerHTML = state.currentLang === 'hi' ? I18N.hi.btnListen : I18N.en.btnListen;
-    return;
-  }
+function renderMedicationCards(meds, hi) {
+  el['medications-cards'].innerHTML = meds.map((m) => `
+    <article class="med-card">
+      <div class="med-card-head">
+        <div>
+          <h4>${esc(m.generic_name || m.raw_name)}</h4>
+          <span class="med-category">${esc(hi ? m.category_hi : m.category_en)}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          ${m.identified ? '' : `<span class="badge badge-caution">${esc(tr('notInDb'))}</span>`}
+          <span class="med-dose">${esc(m.dosage || '-')}</span>
+        </div>
+      </div>
+      <dl class="med-grid">
+        <div class="med-field"><dt>${esc(tr('lblDosage'))}</dt><dd>${esc(hi ? m.frequency_hi : m.frequency)}</dd></div>
+        <div class="med-field"><dt>${esc(tr('lblTiming'))}</dt><dd>${esc(hi ? m.timing_hi : m.timing_en)}</dd></div>
+        <div class="med-field"><dt>${esc(tr('lblDuration'))}</dt><dd>${esc(m.duration || '-')}</dd></div>
+        <div class="med-field"><dt>${esc(tr('lblUses'))}</dt><dd>${esc(hi ? m.uses_hi : m.uses_en)}</dd></div>
+      </dl>
+      <div class="med-warning"><strong>${esc(tr('lblWarnings'))}</strong> ${esc(hi ? m.warnings_hi : m.warnings_en)}</div>
+    </article>`).join('');
+}
 
-  if (!state.currentAnalysis) return;
+/* --------------------------------------------------------------------------
+   Text to speech
+   -------------------------------------------------------------------------- */
+function updateAudioButton() {
+  if (!el['audio-label']) return;
+  el['audio-label'].textContent = tr(state.speaking ? 'btnStopListen' : 'btnListen');
+  el['audio-icon'].setAttribute('href', state.speaking ? '#i-stop' : '#i-volume');
+}
 
-  const isHi = state.currentLang === 'hi';
-  const textToRead = isHi ? state.currentAnalysis.analysis.summary_hi : state.currentAnalysis.analysis.summary_en;
+function stopAudio() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  state.speaking = false;
+  updateAudioButton();
+}
 
-  if (!('speechSynthesis' in window)) {
-    alert(isHi ? 'आपके ब्राउज़र में आवाज़ की सुविधा उपलब्ध नहीं है।' : 'Text-to-Speech not supported in this browser.');
-    return;
-  }
+function toggleAudio() {
+  if (state.speaking) { stopAudio(); return; }
+  if (!state.analysis) return;
+  if (!('speechSynthesis' in window)) { el['summary-text'].setAttribute('title', tr('ttsUnsupported')); return; }
+
+  const hi = state.lang === 'hi';
+  const a = state.analysis.analysis;
+  const u = new SpeechSynthesisUtterance(hi ? a.summary_hi : a.summary_en);
+  u.lang = hi ? 'hi-IN' : 'en-US';
+  u.rate = 0.95;
+  const voice = window.speechSynthesis.getVoices().find((v) => v.lang.startsWith(hi ? 'hi' : 'en'));
+  if (voice) u.voice = voice;
+  u.onend = u.onerror = () => { state.speaking = false; updateAudioButton(); };
 
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(textToRead);
-  utterance.lang = isHi ? 'hi-IN' : 'en-US';
-  utterance.rate = 0.95;
-
-  // Try to find appropriate voice
-  const voices = window.speechSynthesis.getVoices();
-  const targetVoice = voices.find(v => isHi ? v.lang.startsWith('hi') : v.lang.startsWith('en'));
-  if (targetVoice) utterance.voice = targetVoice;
-
-  utterance.onend = () => {
-    state.activeSpeech = null;
-    elements.btnAudioSummary.innerHTML = isHi ? I18N.hi.btnListen : I18N.en.btnListen;
-  };
-
-  utterance.onerror = () => {
-    state.activeSpeech = null;
-    elements.btnAudioSummary.innerHTML = isHi ? I18N.hi.btnListen : I18N.en.btnListen;
-  };
-
-  state.activeSpeech = utterance;
-  window.speechSynthesis.speak(utterance);
-  elements.btnAudioSummary.innerHTML = isHi ? I18N.hi.btnStopListen : I18N.en.btnStopListen;
+  state.speaking = true;
+  updateAudioButton();
+  window.speechSynthesis.speak(u);
 }
 
-// Reset UI
+/* --------------------------------------------------------------------------
+   Reset
+   -------------------------------------------------------------------------- */
 function resetToUpload() {
-  if (state.activeSpeech) {
-    window.speechSynthesis.cancel();
-    state.activeSpeech = null;
+  stopAudio();
+  const run = state.run;
+  if (run) {
+    run.ctrl.abort();
+    clearInterval(run.timer);
+    if (run.objectUrl) URL.revokeObjectURL(run.objectUrl);
+    state.run = null;
   }
-  elements.loaderSection.style.display = 'none';
-  elements.resultsContainer.style.display = 'none';
-  elements.inputGrid.style.display = 'grid';
-  elements.fileInput.value = '';
-  elements.cameraInput.value = '';
-  state.currentAnalysis = null;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  state.analysis = null;
+  el['scan-meta'].innerHTML = '';
+  showView('input');
 }

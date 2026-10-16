@@ -1,230 +1,275 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AushadhiDrishti | AI Prescription Scanner & Medication Safety</title>
-  <meta name="description" content="AI-Powered Prescription Scanner and Clinical Safety Assistant powered by Gemma 4. Bilingual Hindi and English medication timetable and drug interaction detection.">
+  <title>AushadhiDrishti | Prescription Scanner and Medication Safety</title>
+  <meta name="description" content="Prescription scanner and medication safety assistant powered by Gemma 4. Bilingual Hindi and English medication timetable and drug interaction screening.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
+  <script>
+    // Apply the stored theme before first paint to avoid a flash.
+    (function () {
+      var t = localStorage.getItem('ad_theme_v2');
+      if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    })();
+  </script>
 </head>
 <body>
 
+  <!-- Icon sprite -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/>
+        <path d="M12 8v8M8 12h8"/>
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
+      </symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>
+      </symbol>
+      <symbol id="i-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/>
+      </symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+      <symbol id="i-print" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="1"/><path d="M7 14h10v6H7z"/>
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 11a8 8 0 0 0-14.5-4M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.5 4M20 20v-4h-4"/>
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3L12 4z"/><path d="M12 10v4M12 17.2v.1"/></symbol>
+      <symbol id="i-octagon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 3h7L21 8.5v7L15.5 21h-7L3 15.5v-7L8.5 3z"/><path d="M9 9l6 6M15 9l-6 6"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    </defs>
+  </svg>
+
+  <a class="skip-link" href="#main">Skip to content</a>
+
   <div class="app-container">
-    <!-- Top Navigation Header -->
+    <!-- Header -->
     <header class="app-header">
-      <div class="brand-wrapper">
-        <div class="brand-logo" aria-hidden="true">👁️</div>
-        <div>
-          <h1 class="brand-title" id="app-heading" data-i18n="appTitle">Aushadhi<span class="brand-gradient">Drishti</span></h1>
-          <p class="brand-tagline" data-i18n="appTagline">AI Prescription Intelligence & Safety Scanner</p>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><svg width="22" height="22"><use href="#i-logo"/></svg></span>
+        <div class="brand-text">
+          <h1 class="brand-title" data-i18n="appTitle">AushadhiDrishti</h1>
+          <p class="brand-tagline" data-i18n="appTagline">Prescription scanner and medication safety</p>
         </div>
       </div>
 
       <div class="header-actions">
-        <!-- Language Switcher -->
-        <div class="lang-switch" role="group" aria-label="Language Selector">
-          <button id="lang-en" class="lang-btn active" title="Switch to English">🇬🇧 English</button>
-          <button id="lang-hi" class="lang-btn" title="हिन्दी में बदलें">🇮🇳 हिन्दी</button>
+        <div class="segmented" role="group" aria-label="Language">
+          <button id="lang-en" class="segmented-btn active" type="button" lang="en">English</button>
+          <button id="lang-hi" class="segmented-btn" type="button" lang="hi">हिन्दी</button>
         </div>
-
-        <!-- Theme Toggle -->
-        <button id="btn-theme-toggle" class="btn btn-secondary btn-icon" title="Toggle Light/Dark Theme">☀️</button>
-
-        <!-- API Settings Modal Button -->
-        <button id="btn-settings-open" class="btn btn-outline" data-i18n="btnSettings">⚙️ API Settings</button>
+        <button id="btn-theme-toggle" class="btn btn-ghost" type="button" data-i18n="themeDark">Dark mode</button>
+        <button id="btn-settings-open" class="btn btn-ghost" type="button" data-i18n="btnSettings">API settings</button>
       </div>
     </header>
 
-    <!-- Hero Section -->
-    <section class="hero-section">
-      <div class="hero-pill" data-i18n="heroPill">⚡ Powered by Gemma 4 Multimodal Vision</div>
-      <h2 class="hero-title" data-i18n="heroTitle">Decode Any Prescription with <span>Clinical Precision</span></h2>
-      <p class="hero-desc" data-i18n="heroDesc">
-        Eliminate doctor handwriting confusion, prevent dangerous drug-drug interactions, and view clear bilingual medication timetables.
-      </p>
-    </section>
-
-    <!-- Upload & Presets Grid -->
-    <div id="input-grid" class="input-section-grid">
-      <!-- Main Dropzone -->
-      <div id="dropzone" class="dropzone-card" tabindex="0" role="button" aria-label="Upload Prescription">
-        <div class="dropzone-icon-ring">📄</div>
-        <h3 class="dropzone-title" data-i18n="dropTitle">Upload Doctor Prescription Scan</h3>
-        <p class="dropzone-subtitle" data-i18n="dropSub">Drag & drop image here, browse file, or snap with mobile camera</p>
-
-        <div class="dropzone-actions">
-          <button id="btn-browse" class="btn btn-primary" type="button" data-i18n="btnBrowse">📁 Choose File</button>
-          <button id="btn-camera" class="btn btn-secondary" type="button" data-i18n="btnCamera">📷 Take Photo</button>
+    <main id="main">
+      <!-- VIEW: Input -->
+      <section id="view-input" class="view">
+        <div class="intro">
+          <p class="eyebrow" data-i18n="heroPill">Gemma 4 multimodal vision</p>
+          <h2 class="intro-title" data-i18n="heroTitle">Read any prescription. Check it for unsafe combinations.</h2>
+          <p class="intro-desc" data-i18n="heroDesc">Upload a photo of a prescription to extract each medicine, screen for drug interactions, and get a daily timetable in English and Hindi.</p>
         </div>
 
-        <input type="file" id="file-input" class="file-hidden" accept="image/png,image/jpeg,image/webp" style="display: none;">
-        <input type="file" id="camera-input" class="file-hidden" accept="image/*" capture="environment" style="display: none;">
-      </div>
-
-      <!-- Quick Sample Presets Card -->
-      <aside class="presets-card">
-        <div class="presets-header">
-          <h3 data-i18n="presetsTitle">⚡ Quick Demos</h3>
-          <span class="badge-quick" data-i18n="badgeQuick">1-Click Test</span>
-        </div>
-        <div id="presets-list" class="preset-list">
-          <!-- Populated dynamically via JS -->
-        </div>
-      </aside>
-    </div>
-
-    <!-- Glowing Loader Section (Hidden by Default) -->
-    <section id="loader-section" class="loader-section" style="display: none;" aria-live="polite">
-      <div class="pulsing-spinner"></div>
-      <h3 class="loader-title" data-i18n="loadingTitle">AI Clinical Engine Analyzing...</h3>
-      <p class="loader-status" data-i18n="loadingSub">Processing handwriting with Gemma 4 Vision & Pharmacology Safety Matrix</p>
-      
-      <div class="loader-steps">
-        <div id="step-1" class="loader-step-pill" data-i18n="step1">Contrast & Edge Enhancement</div>
-        <div id="step-2" class="loader-step-pill" data-i18n="step2">Gemma 4 Multimodal Vision</div>
-        <div id="step-3" class="loader-step-pill" data-i18n="step3">Drug Interaction Verification</div>
-        <div id="step-4" class="loader-step-pill" data-i18n="step4">Bilingual Timetable Synthesis</div>
-      </div>
-    </section>
-
-    <!-- Results Section (Hidden by Default) -->
-    <main id="results-container" class="results-container" style="display: none;">
-      <!-- Left Column: Prescription Viewer & Patient Details -->
-      <div class="prescription-viewer-card">
-        <div class="viewer-header">
-          <h3 data-i18n="viewerTitle">Enhanced Prescription Scan</h3>
-          <span id="source-tag" class="preset-tag tag-acute">Gemma 4</span>
-        </div>
-
-        <div class="image-preview-wrapper">
-          <img id="image-preview" src="" alt="Enhanced Prescription Scan">
-        </div>
-
-        <div class="patient-info-card">
-          <div class="patient-info-title" data-i18n="patientDetails">Patient Case Profile</div>
-          <div class="patient-meta-grid">
-            <div class="meta-item">
-              <label data-i18n="lblPatient">Patient Name</label>
-              <span id="patient-name">Rajesh Kumar Sharma</span>
+        <div class="input-grid">
+          <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload prescription image">
+            <span class="dropzone-icon" aria-hidden="true"><svg width="28" height="28"><use href="#i-upload"/></svg></span>
+            <h3 class="dropzone-title" data-i18n="dropTitle">Upload a prescription image</h3>
+            <p class="dropzone-sub" data-i18n="dropSub">Drag and drop a file here, or choose one. JPG, PNG or WebP.</p>
+            <div class="dropzone-actions">
+              <button id="btn-browse" class="btn btn-primary" type="button">
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-upload"/></svg>
+                <span data-i18n="btnBrowse">Choose file</span>
+              </button>
+              <button id="btn-camera" class="btn btn-secondary" type="button">
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-camera"/></svg>
+                <span data-i18n="btnCamera">Take photo</span>
+              </button>
             </div>
-            <div class="meta-item">
-              <label data-i18n="lblVitals">Demographics</label>
-              <span id="patient-vitals">54 Y / Male</span>
+            <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden>
+            <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+          </div>
+
+          <aside class="panel presets">
+            <div class="panel-head">
+              <h3 data-i18n="presetsTitle">Sample prescriptions</h3>
             </div>
-            <div class="meta-item">
-              <label data-i18n="lblDoctor">Doctor / Clinic</label>
-              <span id="patient-doctor">Dr. Arvind Mehra, MD</span>
+            <p class="panel-note" data-i18n="presetsNote">Run the pipeline on a built-in example.</p>
+            <div id="presets-list" class="preset-list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- VIEW: Progress -->
+      <section id="view-progress" class="view" hidden>
+        <div class="progress-grid">
+          <div class="panel scan-panel">
+            <div class="panel-head">
+              <h3 data-i18n="docTitle">Document</h3>
+              <span id="scan-badge" class="badge badge-neutral">Scanning</span>
             </div>
-            <div class="meta-item">
-              <label data-i18n="lblDate">Date</label>
-              <span id="patient-date">16 Oct 2026</span>
+            <div id="scan-frame" class="scan-frame is-scanning">
+              <img id="scan-image" alt="Prescription being analyzed" hidden>
+              <div class="scan-skeleton" id="scan-skeleton"></div>
+              <div class="scan-line" aria-hidden="true"></div>
+              <span class="corner tl" aria-hidden="true"></span><span class="corner tr" aria-hidden="true"></span>
+              <span class="corner bl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
+            </div>
+            <dl id="scan-meta" class="meta-list"></dl>
+          </div>
+
+          <div class="panel progress-panel">
+            <div class="panel-head">
+              <h3 data-i18n="progressTitle">Analysis progress</h3>
+              <div class="panel-head-actions">
+                <span id="elapsed" class="mono muted">0.0 s</span>
+                <button id="btn-cancel" class="btn btn-ghost btn-sm" type="button" data-i18n="btnCancel">Cancel</button>
+              </div>
+            </div>
+
+            <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="progress-label" id="progress-track">
+              <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div class="progress-caption">
+              <span id="progress-label">Starting</span>
+              <span id="progress-pct" class="mono">0%</span>
+            </div>
+
+            <ol id="stage-list" class="stage-list" aria-live="polite"></ol>
+
+            <div id="progress-error" class="inline-alert" role="alert" hidden>
+              <div>
+                <strong data-i18n="errTitle">Analysis could not be completed</strong>
+                <p id="progress-error-text"></p>
+              </div>
+              <button id="btn-error-back" class="btn btn-secondary" type="button" data-i18n="btnBack">Back to upload</button>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Right Column: Clinical Intelligence & Schedule -->
-      <div class="intelligence-col">
-        <!-- Safety Assessment Banner -->
-        <div id="safety-banner" class="safety-banner safe">
-          <div id="safety-icon" class="safety-icon">✅</div>
-          <div class="safety-text">
-            <h4 id="safety-title">SAFE / NO CRITICAL CONFLICTS</h4>
-            <p id="safety-desc">No dangerous drug-drug interactions detected between the identified medications.</p>
-          </div>
-        </div>
-
-        <!-- Patient-Friendly Summary Card -->
-        <div class="summary-card">
-          <div class="summary-header">
-            <h3 class="summary-title" data-i18n="summaryTitle">Patient Friendly Overview</h3>
-            <button id="btn-audio-summary" class="btn btn-primary" type="button" data-i18n="btnListen">🔊 Listen Aloud</button>
-          </div>
-          <div id="summary-text" class="summary-content">
-            <!-- Populated dynamically in English or Hindi -->
-          </div>
-        </div>
-
-        <!-- Drug Interactions Card -->
-        <div class="interactions-card">
-          <h3 class="card-heading" data-i18n="interactionsTitle">⚠️ Drug-Drug Interaction Safety Alerts</h3>
-          <div id="interactions-list">
-            <!-- Populated dynamically -->
-          </div>
-        </div>
-
-        <!-- Daily Medication Timetable -->
-        <div class="schedule-card">
-          <h3 class="card-heading" data-i18n="scheduleTitle">📅 Daily Medication Timetable</h3>
-          <div class="schedule-grid">
-            <!-- Morning Slot -->
-            <div class="time-slot-column">
-              <div class="slot-header slot-morning" data-i18n="slotMorning">☀️ Morning (सुबह)</div>
-              <div id="schedule-morning"></div>
+      <!-- VIEW: Results -->
+      <section id="view-results" class="view results-grid" hidden>
+        <aside class="results-side">
+          <div class="panel">
+            <div class="panel-head">
+              <h3 data-i18n="viewerTitle">Enhanced scan</h3>
+              <span id="source-tag" class="badge badge-neutral">Gemma 4</span>
             </div>
-            <!-- Afternoon Slot -->
-            <div class="time-slot-column">
-              <div class="slot-header slot-afternoon" data-i18n="slotAfternoon">🌤️ Afternoon (दोपहर)</div>
-              <div id="schedule-afternoon"></div>
-            </div>
-            <!-- Night Slot -->
-            <div class="time-slot-column">
-              <div class="slot-header slot-night" data-i18n="slotNight">🌙 Night (रात)</div>
-              <div id="schedule-night"></div>
+            <div class="image-wrap"><img id="image-preview" src="" alt="Enhanced prescription scan"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h3 data-i18n="patientDetails">Prescription details</h3></div>
+            <dl class="detail-grid">
+              <div><dt data-i18n="lblPatient">Patient</dt><dd id="patient-name"></dd></div>
+              <div><dt data-i18n="lblVitals">Age / sex</dt><dd id="patient-vitals"></dd></div>
+              <div><dt data-i18n="lblDoctor">Doctor</dt><dd id="patient-doctor"></dd></div>
+              <div><dt data-i18n="lblDate">Date</dt><dd id="patient-date"></dd></div>
+            </dl>
+          </div>
+        </aside>
+
+        <div class="results-main">
+          <div id="safety-banner" class="safety-banner safe" role="status">
+            <svg id="safety-icon" class="safety-icon" width="28" height="28" aria-hidden="true"><use href="#i-check-circle"/></svg>
+            <div class="safety-text">
+              <h3 id="safety-title"></h3>
+              <p id="safety-desc"></p>
             </div>
           </div>
-        </div>
 
-        <!-- Detailed Medication Cards -->
-        <div>
-          <h3 class="card-heading" data-i18n="medsListTitle">💊 Identified Medications & Clinical Guidance</h3>
-          <div id="medications-cards" class="med-cards-container">
-            <!-- Cards populated dynamically -->
+          <div class="panel reveal">
+            <div class="panel-head">
+              <h3 data-i18n="summaryTitle">Plain-language summary</h3>
+              <button id="btn-audio-summary" class="btn btn-secondary btn-sm" type="button">
+                <svg width="15" height="15" aria-hidden="true"><use id="audio-icon" href="#i-volume"/></svg>
+                <span id="audio-label" data-i18n="btnListen">Listen</span>
+              </button>
+            </div>
+            <p id="summary-text" class="summary-text"></p>
           </div>
-        </div>
 
-        <!-- Floating Action Bar -->
-        <div class="bottom-action-bar">
-          <button id="btn-scan-new" class="btn btn-secondary" data-i18n="btnScanNew">🔄 Scan Another Prescription</button>
-          <button id="btn-print-card" class="btn btn-primary" data-i18n="btnDownloadPDF">📥 Print / Save Medical Card</button>
-        </div>
+          <div class="panel reveal">
+            <div class="panel-head"><h3 data-i18n="interactionsTitle">Drug interaction screening</h3></div>
+            <div id="interactions-list"></div>
+          </div>
 
-        <!-- Disclaimer -->
-        <p style="font-size: 0.8rem; color: var(--text-dim); text-align: center; margin-top: 20px;" data-i18n="disclaimer">
-          ⚕️ Medical Disclaimer: AushadhiDrishti is an AI-powered assistant designed for educational and informational support. Always consult a certified physician or pharmacist before changing or stopping medications.
-        </p>
-      </div>
+          <div class="panel reveal">
+            <div class="panel-head"><h3 data-i18n="scheduleTitle">Daily timetable</h3></div>
+            <div class="schedule-grid">
+              <div class="slot">
+                <div class="slot-head"><span data-i18n="slotMorning">Morning</span><span class="slot-count" id="count-morning"></span></div>
+                <div id="schedule-morning"></div>
+              </div>
+              <div class="slot">
+                <div class="slot-head"><span data-i18n="slotAfternoon">Afternoon</span><span class="slot-count" id="count-afternoon"></span></div>
+                <div id="schedule-afternoon"></div>
+              </div>
+              <div class="slot">
+                <div class="slot-head"><span data-i18n="slotNight">Night</span><span class="slot-count" id="count-night"></span></div>
+                <div id="schedule-night"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="reveal">
+            <h3 class="section-title" data-i18n="medsListTitle">Medications and guidance</h3>
+            <div id="medications-cards" class="med-list"></div>
+          </div>
+
+          <div class="action-bar">
+            <button id="btn-scan-new" class="btn btn-secondary" type="button">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-refresh"/></svg>
+              <span data-i18n="btnScanNew">Scan another prescription</span>
+            </button>
+            <button id="btn-print-card" class="btn btn-primary" type="button">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-print"/></svg>
+              <span data-i18n="btnDownloadPDF">Print or save as PDF</span>
+            </button>
+          </div>
+
+          <p class="disclaimer" data-i18n="disclaimer">Medical disclaimer: AushadhiDrishti is an AI assistant for educational and informational use. Consult a licensed physician or pharmacist before starting, changing or stopping any medication.</p>
+        </div>
+      </section>
     </main>
 
-    <!-- Settings Modal -->
+    <!-- Settings dialog -->
     <div id="modal-settings" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div class="modal-content">
+      <div class="modal">
         <div class="modal-header">
-          <h3 id="modal-title" data-i18n="settingsTitle">Gemma 4 API Configuration</h3>
-          <button id="btn-settings-close" class="modal-close" aria-label="Close Modal">&times;</button>
+          <h3 id="modal-title" data-i18n="settingsTitle">Gemma 4 API configuration</h3>
+          <button id="btn-settings-close" class="icon-btn" type="button" aria-label="Close"><svg width="18" height="18"><use href="#i-x"/></svg></button>
         </div>
         <form id="form-settings">
           <div class="form-group">
-            <label for="input-api-key" data-i18n="lblApiKey">API Key (Google AI Studio / Groq / OpenRouter)</label>
-            <input type="password" id="input-api-key" class="form-input" placeholder="Paste your API key here...">
+            <label for="input-api-key" data-i18n="lblApiKey">API key</label>
+            <input type="password" id="input-api-key" class="form-input" autocomplete="off" placeholder="Paste your API key">
           </div>
           <div class="form-group">
-            <label for="input-api-base" data-i18n="lblApiBase">API Base URL</label>
+            <label for="input-api-base" data-i18n="lblApiBase">API base URL</label>
             <input type="text" id="input-api-base" class="form-input" value="https://generativelanguage.googleapis.com/v1beta">
           </div>
           <div class="form-group">
-            <label for="input-model" data-i18n="lblModel">Model Identifier</label>
-            <input type="text" id="input-model" class="form-input" value="gemma-4-it">
+            <label for="input-model" data-i18n="lblModel">Model identifier</label>
+            <input type="text" id="input-model" class="form-input" value="gemma-4-26b-a4b-it">
           </div>
-          <p style="font-size: 0.78rem; color: var(--text-dim); margin-bottom: 20px;">
-            Tip: Leave API Key blank to use the offline heuristic clinical intelligence engine during offline hackathon demos.
-          </p>
-          <button type="submit" class="btn btn-primary w-full" style="width: 100%; justify-content: center;" data-i18n="btnSaveConfig">
-            Save Configuration
-          </button>
+          <p class="form-hint" data-i18n="settingsHint">Without an API key the app uses its built-in offline engine, which returns fixed demo data instead of reading the image.</p>
+          <div class="modal-footer">
+            <span id="settings-status" class="form-status" role="status"></span>
+            <button type="submit" class="btn btn-primary" data-i18n="btnSaveConfig">Save</button>
+          </div>
         </form>
       </div>
     </div>
